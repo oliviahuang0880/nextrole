@@ -1,11 +1,11 @@
 ---
 name: nextrole
-description: 台灣求職／找工作／換工作流程。用對話引導使用者完成天賦問卷（可選，邀朋友看自己天賦）與技能問卷（35 題情境式自評），產出個人化關鍵字後，到 104/Cake/LinkedIn 中立廣撒搜尋並評分，輸出可篩選的 HTML 報表。觸發詞：找工作、求職、換工作、找職缺、職涯盤點、job search Taiwan、台北求職、轉職、面試準備、想換跑道。
+description: 求職／找工作／換工作流程，預設台灣、可選海外/全球/遠端。用對話引導使用者完成天賦問卷（可選，邀朋友看自己天賦）與技能問卷（35 題情境式自評），產出個人化關鍵字後，到 104/Cake/LinkedIn 中立廣撒搜尋並評分，輸出可篩選的 HTML 報表。觸發詞：找工作、求職、換工作、找職缺、職涯盤點、海外求職、全球求職、遠端工作、remote job、job search、台北求職、轉職、面試準備、想換跑道。
 ---
 
 # NextRole — 台灣求職盤點 Skill
 
-幫使用者透過對話完成「天賦＋技能」雙面向問卷，產出個人化關鍵字檔，自動搜尋 104/Cake/LinkedIn 並評分。**TW only**。
+幫使用者透過對話完成「天賦＋技能」雙面向問卷，產出個人化關鍵字檔，自動搜尋 104/Cake/LinkedIn 並評分。**預設台灣，也可選海外/全球/遠端**。
 
 ## 流程順序（嚴格遵守）
 
@@ -127,10 +127,25 @@ JSON 結構：`{"classifications": {...}, "notes": {...}}`
 
 依序問三題：
 
-### 4a. 地區（必填，無預設）
-> 「想找哪些地區？例如：台北、新北、桃園、新竹、台中、高雄⋯ 你可以講多個。也可以說『全台都看』或『遠端優先』。」
+### 4a. 地區（必填，無預設，可複選）
+> 「想找哪裡的工作？（可複選，用逗號或空格分開）
+>
+> 1️⃣ 台灣 — 台北/新北/桃園/新竹/台中/高雄⋯（會再追問哪些城市）
+> 2️⃣ 亞太 — Singapore / Tokyo / Hong Kong / Seoul / Sydney / KL / Bangkok
+> 3️⃣ 全球 — 不限地點，撈各國
+> 4️⃣ 全遠端 — 只要 Remote 職缺
+>
+> 例：『1, 4』= 台灣＋全遠端」
 
-把答案寫入 profile 的 `filters.allowed_cities`（陣列，空陣列 = 全台不過濾）和 `filters.allow_remote`（true/false）。用 `python3` 直接修改 `~/.nextrole/profile.json` 即可（小改動，不用另寫腳本）。
+依答案寫入 profile 的 `filters.regions`（陣列）。對應 key：`tw` / `apac` / `global` / `remote`。
+
+- 含 `1`（台灣）→ 追問「台灣哪些城市？」寫入 `filters.allowed_cities`（陣列，空陣列 = 全台不過濾）。
+- 不含 `1` → `allowed_cities` 留空 `[]`。
+- `filters.allow_remote` 預設 `true`（任何 region 都收遠端職缺）。
+
+用 `python3` 直接修改 `~/.nextrole/profile.json` 即可（小改動，不用另寫腳本）。
+
+**提醒使用者**：選 `2`（亞太）會掃 7 個亞太城市，整跑約 5–8 分鐘；選 `3` 或 `4` 通常 2–3 分鐘。
 
 ### 4b. 領域偏好（選填，影響「評分」）
 > 「想偏向某個領域嗎？例如 UX、PM、行銷、data analyst⋯（不填 = 中立廣撒）」
@@ -156,6 +171,49 @@ JSON 結構：`{"classifications": {...}, "notes": {...}}`
 - **4c → `extra_queries`** = 拓寬搜尋（去三站撈得到哪些職缺）
 
 兩個做不同層次的事，不衝突也不重疊。
+
+### 4d. 負向詞 / 排除題（必問，每個使用者都要問）
+
+**沒有預設負向詞**——這個 skill 不替使用者預設「實習/兼職/電話銷售」等該不該排除，由使用者自己決定。
+
+問法（先講影響、再給範例、最後接受自由填答）：
+
+> 「最後一題：有什麼**職稱或工作類型**你看到就想直接跳過？
+>
+> 這些叫『負向詞』，影響方式是：
+> - 出現在**職稱**裡 → 整筆直接剔除（不會出現在結果列表）
+> - 只出現在 JD 內文 → **扣分**（會排到清單後面，但仍看得到）
+>
+> 常見可排除項（可複選、可全不選、也可自己加）：
+> A. 實習 / Internship
+> B. 兼職 / Part-time
+> C. 工讀
+> D. 約聘 / Contractor
+> E. 自由接案 / Freelance
+> F. 顧問 / Consultant
+> G. 電話銷售 / Telesales（這個無論職稱或內文出現都直接剔除）
+> H. 其他：請自由打字（例：『都市規劃』『土木』『MLM』）
+>
+> 例：『A, B, G』= 排除實習、兼職、電話銷售；或直接『沒有』跳過。」
+
+寫入規則（直接改 `~/.nextrole/profile.json` 的 `negative` 陣列）：
+
+- A–F 與 H 自由打字項 → 寫成 `{"term": "<中文>", "en": "<英文>", "exclude_if_title": True}`
+- G「電話銷售/Telesales」→ 寫成 `{"term": "電話銷售", "en": "telesales", "exclude": True}`（任何地方命中即剔除）
+- A–G 的英文已知對照表：
+
+  | 選項 | term | en |
+  |---|---|---|
+  | A | 實習 | intern |
+  | B | 兼職 | part-time |
+  | C | 工讀 | (無) |
+  | D | 約聘 | contractor |
+  | E | 自由接案 | freelance |
+  | F | 顧問 | consultant |
+  | G | 電話銷售 | telesales |
+
+- H 使用者打的中文詞 → **由你（對話的 Claude）順手補英文翻譯**寫進 `en`；若使用者直接打英文，`term` 就放英文、`en` 留空。
+- **使用者回「沒有」、空字串、或全不勾 → profile 的 `negative` 不動，零負向詞。**
 
 ## 5. 執行搜尋
 
@@ -188,7 +246,7 @@ cd ~/.claude/skills/nextrole/scripts && uv run run_search.py --queries <extra_qu
 - **不需要 ANTHROPIC_API_KEY**：彙整朋友描述、抽 JD 關鍵字都由你（對話的 Claude）做。
 - **資料本機**：所有 profile 存在使用者本機 `~/.nextrole/`，沒有上傳。
 - **覆蓋自動備份**：`profile_io.py` 在覆蓋 profile.json 前會自動 cp 一份 `profile.<UTC ts>.json`。
-- **TW only**：地區限台灣，職缺站只爬 104/Cake/LinkedIn TW。
+- **地區彈性**：預設台灣（104 + Cake + LinkedIn TW），4a 可選海外/亞太/全球/全遠端，海外模式時 104 自動跳過、LinkedIn 改撈對應地點。
 
 ## 檔案位置摘要
 

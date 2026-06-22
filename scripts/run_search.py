@@ -57,25 +57,52 @@ def dedupe(jobs: list[dict]) -> list[dict]:
     return out
 
 
+APAC_KW = ("Singapore", "Tokyo", "Japan", "Hong Kong", "Korea", "Seoul",
+           "Sydney", "Australia", "Kuala Lumpur", "Malaysia", "Bangkok", "Thailand")
+
+APAC_LINKEDIN_LOCS = (
+    "Singapore", "Tokyo, Japan", "Hong Kong", "Seoul, South Korea",
+    "Sydney, Australia", "Kuala Lumpur, Malaysia", "Bangkok, Thailand",
+)
+
+
 def passes_filter(job: dict, cfg: dict) -> bool:
     f = cfg.get("filters", {})
+    regions = f.get("regions", ["tw"])
+    loc = job.get("location") or ""
     if f.get("allow_remote") and job.get("remote"):
         return True
-    cities = f.get("allowed_cities")
-    if not cities:
-        return True
-    loc = job.get("location") or ""
-    return any(c in loc for c in cities)
+    cities = f.get("allowed_cities", [])
+    for r in regions:
+        if r == "tw" and (not cities or any(c in loc for c in cities)):
+            return True
+        if r == "apac" and any(k in loc for k in APAC_KW):
+            return True
+        if r == "global":
+            return True
+        if r == "remote" and job.get("remote"):
+            return True
+    return False
 
 
 def gather(cfg: dict, max_per: int, extra: list[str]) -> list[dict]:
     queries = collect_queries(cfg, extra)
+    regions = cfg.get("filters", {}).get("regions", ["tw"])
     all_jobs: list[dict] = []
     for q in queries:
         print(f"  搜尋「{q}」…")
-        all_jobs.extend(search_104(q, max_jobs=max_per, pages=1))
+        if "tw" in regions:
+            all_jobs.extend(search_104(q, max_jobs=max_per, pages=1))
         all_jobs.extend(search_cake(q, max_jobs=max_per, pages=1))
-        all_jobs.extend(search_linkedin(q, max_jobs=30, pages=3))
+        if "tw" in regions:
+            all_jobs.extend(search_linkedin(q, max_jobs=30, pages=3, location="Taipei, Taiwan"))
+        if "apac" in regions:
+            for loc in APAC_LINKEDIN_LOCS:
+                all_jobs.extend(search_linkedin(q, max_jobs=15, pages=2, location=loc))
+        if "global" in regions:
+            all_jobs.extend(search_linkedin(q, max_jobs=30, pages=3, location=""))
+        if "remote" in regions:
+            all_jobs.extend(search_linkedin(q, max_jobs=30, pages=3, location="", f_wt=2))
         time.sleep(1.5)
     return dedupe(all_jobs)
 

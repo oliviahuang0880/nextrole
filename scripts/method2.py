@@ -66,17 +66,8 @@ SKILLS = [
 SKILL_BY_KEY = {s["key"]: s for s in SKILLS}
 VALID_CATS = {"on_fire", "heating", "burnout", "cold"}
 
-# 通用負向（與問卷無關的求職衛生；對齊 profile/keywords.json 規則）
-BASE_NEGATIVE = [
-    {"term": "電話銷售", "en": "telesales", "exclude": True},
-    {"term": "實習", "en": "intern", "exclude_if_title": True},
-    {"term": "兼職", "en": "part-time", "exclude_if_title": True},
-    {"term": "工讀", "exclude_if_title": True},
-    {"term": "系統架構", "en": "system architect", "exclude_if_title": True, "penalty": 30},
-    {"term": "都市", "en": "urban planning", "exclude_if_title": True, "penalty": 30},
-    {"term": "土木", "exclude_if_title": True, "penalty": 30},
-    {"term": "韌體", "en": "firmware", "penalty": 20},
-]
+# 通用負向預設為空：由 SKILL.md 4d 問使用者再寫入（ponytail: 不灌預設）
+BASE_NEGATIVE: list[dict] = []
 
 
 # ───────────────────────── 問卷：按面向分組、逐技能歸類 ─────────────────────────

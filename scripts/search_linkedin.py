@@ -32,12 +32,26 @@ def _jobid(url: str) -> str:
     return m.group(1) if m else ""
 
 
+_REMOTE_HINTS = ("remote", "遠端", "遠距")
+
+
+def _looks_remote(text: str) -> bool:
+    s = (text or "").lower()
+    return any(h in s for h in _REMOTE_HINTS)
+
+
 def search_linkedin(keyword: str, max_jobs: int = 20, location: str = "Taipei, Taiwan",
-                    pages: int = 1, delay: float = 1.0):
-    """回傳該關鍵字的 LinkedIn 職缺卡片（統一格式，description 先留空，候選階段再補）。"""
+                    pages: int = 1, delay: float = 1.0, f_wt: int | None = None):
+    """回傳該關鍵字的 LinkedIn 職缺卡片（統一格式，description 先留空，候選階段再補）。
+
+    f_wt: LinkedIn work type filter — 1=onsite, 2=remote, 3=hybrid。
+    ponytail: 訪客 API 無公開文件，f_WT 是觀察值；下游靠 job.remote 兜底。
+    """
     jobs = []
     for page in range(pages):
-        params = {"keywords": keyword, "location": location, "start": page * 10}
+        params: dict = {"keywords": keyword, "location": location, "start": page * 10}
+        if f_wt is not None:
+            params["f_WT"] = f_wt
         try:
             resp = http_client.get(SEARCH_URL, params=params, headers=HEADERS, timeout=20)
         except Exception as e:  # noqa: BLE001
@@ -55,14 +69,16 @@ def search_linkedin(keyword: str, max_jobs: int = 20, location: str = "Taipei, T
             loc = li.select_one(".job-search-card__location")
             a = li.select_one("a.base-card__full-link") or li.select_one("a")
             url = a["href"].split("?")[0] if (a and a.has_attr("href")) else ""
+            loc_text = loc.get_text(strip=True) if loc else ""
+            title_text = t.get_text(strip=True)
             jobs.append({
                 "source": "LinkedIn",
-                "title": t.get_text(strip=True),
+                "title": title_text,
                 "company": co.get_text(strip=True) if co else "",
                 "url": url,
-                "location": loc.get_text(strip=True) if loc else "",
+                "location": loc_text,
                 "description": "",
-                "remote": False,
+                "remote": _looks_remote(loc_text) or _looks_remote(title_text) or f_wt == 2,
             })
             if len(jobs) >= max_jobs:
                 return jobs
