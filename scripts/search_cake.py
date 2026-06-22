@@ -11,6 +11,8 @@ import re
 import time
 from urllib.parse import quote
 
+from bs4 import BeautifulSoup
+
 import http_client
 
 SEARCH_URL = "https://www.cake.me/jobs"
@@ -85,6 +87,36 @@ def search_cake(keyword: str, max_jobs: int = 25, pages: int = 2, delay: float =
     return jobs
 
 
+def fetch_cake_full(url: str, delay: float = 0.4) -> str:
+    """抓 Cake 職缺頁的完整 JD（job.description + requirements，去 HTML）。失敗回空字串。
+
+    ponytail: 走 SSR 的 __NEXT_DATA__，不需要瀏覽器渲染。
+              ceiling: Cake 改頁面結構或欄位名時會失效，下游靠 min_jd 兜底。
+    """
+    if not url:
+        return ""
+    try:
+        resp = _get_with_retry(url, retries=2)
+    except Exception as e:  # noqa: BLE001
+        print(f"[Cake] 抓完整 JD 失敗：{e}")
+        return ""
+    m = _NEXT_RE.search(resp.text)
+    if not m:
+        return ""
+    try:
+        data = json.loads(m.group(1))
+        job = data.get("props", {}).get("pageProps", {}).get("job", {}) or {}
+    except Exception:  # noqa: BLE001
+        return ""
+    parts = []
+    for k in ("description", "requirements"):
+        v = job.get(k) or ""
+        if v:
+            parts.append(BeautifulSoup(v, "html.parser").get_text("\n", strip=True))
+    time.sleep(delay)
+    return "\n\n".join(p for p in parts if p)
+
+
 if __name__ == "__main__":
     import sys
 
@@ -92,3 +124,6 @@ if __name__ == "__main__":
     result = search_cake(kw, max_jobs=10, pages=1)
     print(f"關鍵字「{kw}」抓到 {len(result)} 筆")
     print(json.dumps(result[:3], ensure_ascii=False, indent=2))
+    if result:
+        full = fetch_cake_full(result[0]["url"])
+        print(f"\n第一筆完整 JD 長度：{len(full)}；前 150 字：{full[:150]}")

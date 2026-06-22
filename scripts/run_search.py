@@ -23,7 +23,7 @@ from pathlib import Path
 
 from score import score_job
 from search_104 import search_104, fetch_104_full
-from search_cake import search_cake
+from search_cake import search_cake, fetch_cake_full
 from search_linkedin import search_linkedin, fetch_linkedin_full
 from profile_io import load_profile
 
@@ -145,27 +145,32 @@ def enrich_and_filter(jobs: list[dict], cfg: dict, top_n: int, min_jd: int) -> l
         pool.append(j)
     pool.sort(key=lambda j: score_job(j, cfg)["score"], reverse=True)
     candidates = pool[:top_n]
-    print(f"  粗篩後候選 {len(candidates)} 筆，開始抓完整 JD（104/LinkedIn）…")
+    print(f"  粗篩後候選 {len(candidates)} 筆，開始抓完整 JD（104/LinkedIn/Cake）…")
 
     out, n_fetched, n_short = [], 0, 0
+    short_by_src: dict[str, int] = {}
     for i, j in enumerate(candidates):
-        if j.get("source") == "104":
+        src = j.get("source")
+        if src == "104":
             full = fetch_104_full(j.get("url", ""))
-            if full:
-                j["description"] = full
-                n_fetched += 1
-        elif j.get("source") == "LinkedIn":
+        elif src == "LinkedIn":
             full = fetch_linkedin_full(j.get("url", ""))
-            if full:
-                j["description"] = full
-                n_fetched += 1
+        elif src == "Cake":
+            full = fetch_cake_full(j.get("url", ""))
+        else:
+            full = ""
+        if full:
+            j["description"] = full
+            n_fetched += 1
         if len((j.get("description") or "").strip()) >= min_jd:
             out.append(j)
         else:
             n_short += 1
+            short_by_src[src or "?"] = short_by_src.get(src or "?", 0) + 1
         if (i + 1) % 50 == 0:
             print(f"    已處理 {i + 1}/{len(candidates)} …")
-    print(f"  抓了 {n_fetched} 筆完整 JD；剔除太短 {n_short} 筆；留下 {len(out)} 筆。")
+    short_breakdown = "、".join(f"{k}={v}" for k, v in sorted(short_by_src.items())) or "無"
+    print(f"  抓了 {n_fetched} 筆完整 JD；剔除太短 {n_short} 筆（{short_breakdown}）；留下 {len(out)} 筆。")
     return out
 
 
