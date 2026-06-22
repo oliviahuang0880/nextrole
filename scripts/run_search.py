@@ -36,9 +36,10 @@ def collect_queries(cfg: dict, extra: list[str]) -> list[str]:
     for e in cfg.get("method2_positive", []):
         if not e.get("q"):
             continue
-        v = (e.get("term") or "").strip()
-        if v:
-            queries.append(v)
+        for key in ("term", "en"):
+            v = (e.get(key) or "").strip()
+            if v:
+                queries.append(v)
     queries.extend(x for x in (extra or []) if x.strip())
     return list(dict.fromkeys(queries))
 
