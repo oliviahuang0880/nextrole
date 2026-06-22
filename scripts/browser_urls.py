@@ -7,10 +7,9 @@
 from __future__ import annotations
 
 import json
-import os
 from urllib.parse import quote
 
-PROFILE_DIR = os.path.join(os.path.dirname(__file__), "..", "profile")
+from profile_io import load_profile
 
 
 def linkedin_url(keyword: str, taiwan: bool = True, remote: bool = True) -> str:
@@ -27,9 +26,12 @@ def jobfrog_url(keyword: str) -> str:
     return f"https://job-frog.com/search?q={quote(keyword)}"
 
 
-def build_urls(keywords_path: str = os.path.join(PROFILE_DIR, "keywords.json")) -> dict:
-    with open(keywords_path, encoding="utf-8") as f:
-        cfg = json.load(f)
+def build_urls(cfg: dict | None = None) -> dict:
+    """從 ~/.nextrole/profile.json 取設定，產生 LinkedIn / JobFrog 搜尋網址。"""
+    if cfg is None:
+        cfg = load_profile()
+    if not cfg:
+        raise SystemExit("找不到 ~/.nextrole/profile.json — 請先做完技能問卷")
     # 搜尋詞 = 候選職稱（較像職缺名）+ 權重最高的幾個正向關鍵字
     titles = cfg.get("candidate_titles", [])
     top_pos = [

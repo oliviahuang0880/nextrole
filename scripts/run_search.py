@@ -65,6 +65,34 @@ APAC_LINKEDIN_LOCS = (
     "Sydney, Australia", "Kuala Lumpur, Malaysia", "Bangkok, Thailand",
 )
 
+# 中英城市對應：LinkedIn 地點是英文（"Taipei, Taiwan"），104/Cake 多為中文。
+# passes_filter 對 tw 城市檢查時兩種都比對，避免 LinkedIn 整批被丟（review #1）。
+TW_CITY_EN = {
+    "台北": ("Taipei",), "臺北": ("Taipei",),
+    "新北": ("New Taipei",),
+    "桃園": ("Taoyuan",),
+    "新竹": ("Hsinchu",),
+    "台中": ("Taichung",), "臺中": ("Taichung",),
+    "台南": ("Tainan",), "臺南": ("Tainan",),
+    "高雄": ("Kaohsiung",),
+    "基隆": ("Keelung",),
+    "嘉義": ("Chiayi",),
+    "宜蘭": ("Yilan",),
+}
+
+
+def _tw_city_match(loc: str, cities: list[str]) -> bool:
+    for c in cities:
+        if c in loc:
+            return True
+        for en in TW_CITY_EN.get(c, ()):
+            if en in loc:
+                return True
+    # ponytail: 沒指定城市時，只要任何台灣英文/中文線索都算 tw 命中
+    if not cities and ("Taiwan" in loc or "台灣" in loc):
+        return True
+    return False
+
 
 def passes_filter(job: dict, cfg: dict) -> bool:
     f = cfg.get("filters", {})
@@ -74,7 +102,7 @@ def passes_filter(job: dict, cfg: dict) -> bool:
         return True
     cities = f.get("allowed_cities", [])
     for r in regions:
-        if r == "tw" and (not cities or any(c in loc for c in cities)):
+        if r == "tw" and (not cities or _tw_city_match(loc, cities)):
             return True
         if r == "apac" and any(k in loc for k in APAC_KW):
             return True

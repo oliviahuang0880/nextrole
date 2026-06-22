@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 
 PROFILE_DIR = os.path.join(os.path.dirname(__file__), "..", "profile")
 DEFAULT_KEYWORDS = os.path.join(PROFILE_DIR, "keywords.json")
@@ -32,6 +33,18 @@ def _terms(entry: dict) -> list[str]:
     return out
 
 
+def _match(term: str, text: str) -> bool:
+    """ASCII 詞用 word boundary（避免 perform 命中 performance），
+    中文/Unicode 詞用子字串（中文沒詞界線）。"""
+    if term.isascii():
+        return re.search(r"(?<![A-Za-z0-9_])" + re.escape(term) + r"(?![A-Za-z0-9_])", text) is not None
+    return term in text
+
+
+def _any_match(terms: list[str], text: str) -> bool:
+    return any(_match(t, text) for t in terms)
+
+
 def _dimension_raw(entries: list[dict], body: str, title: str, title_boost: float):
     """回傳 (加權命中分, 命中詞清單)。
 
@@ -42,10 +55,10 @@ def _dimension_raw(entries: list[dict], body: str, title: str, title_boost: floa
     matched = []
     for entry in entries:
         terms = _terms(entry)
-        if not terms or not any(t in body for t in terms):
+        if not terms or not _any_match(terms, body):
             continue
         weight = entry.get("weight", 1)
-        in_title = any(t in title for t in terms)
+        in_title = _any_match(terms, title)
         raw += weight * (title_boost if in_title else 1)
         matched.append(entry.get("term") or entry.get("en"))
     return raw, matched
@@ -89,11 +102,11 @@ def score_job(job: dict, config: dict) -> dict:
         terms = _terms(entry)
         if not terms:
             continue
-        if any(t in body for t in terms):
+        if _any_match(terms, body):
             matched_neg.append(entry.get("term") or entry.get("en"))
             if entry.get("exclude"):
                 excluded = True
-            elif entry.get("exclude_if_title") and any(t in title for t in terms):
+            elif entry.get("exclude_if_title") and _any_match(terms, title):
                 # Cold 詞出現在職稱＝主要職務 → 排除；只在內文 → 改重扣分
                 excluded = True
             else:
@@ -117,7 +130,15 @@ def score_job(job: dict, config: dict) -> dict:
 
 
 if __name__ == "__main__":
-    cfg = load_config()
+    # 自測：用 build_profile 即時生一份 config（不依賴外部 keywords.json）
+    from method2 import build_profile
+    cfg = build_profile({"research": "on_fire", "analyze": "on_fire", "perform": "cold"}, base={}, notes={})
+
+    # ponytail: 兩個 assert 同時測 word-boundary 修法（#2）與正常評分
+    asc_body = "data analytics and high-performance marketing"
+    assert _match("perform", asc_body) is False, "word-boundary 失效：perform 不該命中 performance"
+    assert _match("analytics", asc_body) is True
+
     sample = {
         "title": "資深使用者研究員 UX Researcher",
         "description": "進行使用者研究與訪談、分析資料找出洞察；需具備良好溝通、跨部門協作與同理心，主動且當責。",
