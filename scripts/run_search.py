@@ -19,6 +19,7 @@ import html
 import json
 import os
 import time
+from pathlib import Path
 
 from score import score_job
 from search_104 import search_104, fetch_104_full
@@ -127,12 +128,14 @@ def render_html(scored: list[dict], cfg: dict, path: str):
         pos = html.escape("、".join(e["matched_pos"][:8]))
         remote = "✅" if j.get("remote") else ""
         rk = f"<td>{rank}</td>" if rank is not None else ""
+        new_mark = "✨" if s.get("is_new") else ""
         link = (
             f'<a href="{url}" target="_blank" rel="noopener noreferrer">{title}</a>'
             if url else title
         )
         return (
-            f"<tr data-src='{src}'>{rk}<td class='score'>{e['score']}</td>"
+            f"<tr data-src='{src}'>{rk}<td class='new'>{new_mark}</td>"
+            f"<td class='score'>{e['score']}</td>"
             f"<td class='sub'>{e.get('score_method2', '')}</td>"
             f"<td class='sub'>{e.get('score_method1', '')}</td>"
             f"<td>{link}</td>"
@@ -154,6 +157,7 @@ def render_html(scored: list[dict], cfg: dict, path: str):
  th,td{{border:1px solid #e3e3e3;padding:6px 8px;text-align:left;vertical-align:top}}
  th{{background:#f6f8fa;position:sticky;top:0}}
  td.score{{font-weight:700;text-align:center;background:#f0f7ff}}
+ td.new{{text-align:center;font-size:16px}}
  td.sub{{text-align:center;color:#666;font-size:12px}}
  td.kw{{color:#0a7a3f;font-size:12px}}
  tr:hover{{background:#fafafa}}
@@ -168,9 +172,9 @@ def render_html(scored: list[dict], cfg: dict, path: str):
 
 <h2>⭐ 推薦職缺（評分 ≥ {threshold}，依分數排序）</h2>
 <p class="meta">總分 = 技能(60%) + 天賦(40%) − 負向懲罰。子分為各面向契合度(0–100)。</p>
-<table><thead><tr><th>#</th><th>總分</th><th>技能</th><th>天賦</th><th>職缺</th><th>公司</th><th>來源</th>
+<table><thead><tr><th>#</th><th>新</th><th>總分</th><th>技能</th><th>天賦</th><th>職缺</th><th>公司</th><th>來源</th>
 <th>遠端</th><th>地點</th><th>命中關鍵字</th></tr></thead>
-<tbody>{rec_rows or '<tr><td colspan=10>目前沒有達門檻的職缺，可調低 threshold 或增加關鍵字。</td></tr>'}</tbody></table>
+<tbody>{rec_rows or '<tr><td colspan=11>目前沒有達門檻的職缺，可調低 threshold 或增加關鍵字。</td></tr>'}</tbody></table>
 
 <h2>📋 廣泛清單（全部職缺，依分數排序）</h2>
 <p class="meta">依來源篩選：
@@ -179,7 +183,7 @@ def render_html(scored: list[dict], cfg: dict, path: str):
 <button class="fbtn" data-f="Cake">Cake</button>
 <button class="fbtn" data-f="LinkedIn">LinkedIn</button>
 <span id="fcount" class="meta"></span></p>
-<table id="allTable"><thead><tr><th>總分</th><th>技能</th><th>天賦</th><th>職缺</th><th>公司</th><th>來源</th>
+<table id="allTable"><thead><tr><th>新</th><th>總分</th><th>技能</th><th>天賦</th><th>職缺</th><th>公司</th><th>來源</th>
 <th>遠端</th><th>地點</th><th>命中關鍵字</th></tr></thead>
 <tbody>{all_rows}</tbody></table>
 <script>
@@ -210,10 +214,11 @@ def render_html(scored: list[dict], cfg: dict, path: str):
 def write_csv(scored: list[dict], path: str):
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)
-        w.writerow(["總分", "技能", "天賦", "推薦", "職缺", "公司", "來源", "遠端", "地點", "命中關鍵字", "連結"])
+        w.writerow(["新", "總分", "技能", "天賦", "推薦", "職缺", "公司", "來源", "遠端", "地點", "命中關鍵字", "連結"])
         for s in scored:
             j, e = s["job"], s["eval"]
             w.writerow([
+                "✨" if s.get("is_new") else "",
                 e["score"], e.get("score_method2", ""), e.get("score_method1", ""),
                 "Y" if e["recommended"] else "",
                 j.get("title", ""), j.get("company", ""), j.get("source", ""),
@@ -230,6 +235,8 @@ def main():
                     help="用 ./output/_jobs_cache.json 重算（不重爬網路）")
     ap.add_argument("--top", type=int, default=300, help="抓完整 JD 的候選數上限")
     ap.add_argument("--min-jd", type=int, default=250, help="完整 JD 最少字數")
+    ap.add_argument("--diff-against", type=str, default=None,
+                    help="一份之前的 results CSV 路徑：本次新出現的 URL 會被標 ✨")
     args = ap.parse_args()
 
     cfg = load_profile()
@@ -261,6 +268,13 @@ def main():
         scored.append({"job": j, "eval": ev})
 
     scored.sort(key=lambda s: s["eval"]["score"], reverse=True)
+
+    prev_urls: set[str] = set()
+    if args.diff_against and Path(args.diff_against).exists():
+        with open(args.diff_against, encoding="utf-8-sig") as f:
+            prev_urls = {r["連結"] for r in csv.DictReader(f) if r.get("連結")}
+    for s in scored:
+        s["is_new"] = bool(prev_urls) and (s["job"].get("url") or "") not in prev_urls
 
     stamp = dt.datetime.now().strftime("%Y%m%d_%H%M")
     html_path = os.path.join(OUTPUT, f"results_{stamp}.html")
