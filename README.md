@@ -11,7 +11,7 @@
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # 2. 把 skill clone 到 Claude Code 的 skills 目錄
-git clone https://github.com/<your-username>/nextrole-skill ~/.claude/skills/nextrole
+git clone https://github.com/oliviahuang0880/nextrole.git ~/.claude/skills/nextrole
 
 # 3. 重開 Claude Code（讓它掃到新 skill）
 ```
