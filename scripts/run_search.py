@@ -57,8 +57,15 @@ def dedupe(jobs: list[dict]) -> list[dict]:
     return out
 
 
-APAC_KW = ("Singapore", "Tokyo", "Japan", "Hong Kong", "Korea", "Seoul",
-           "Sydney", "Australia", "Kuala Lumpur", "Malaysia", "Bangkok", "Thailand")
+APAC_KW = (
+    "Singapore", "新加坡",
+    "Tokyo", "Japan", "日本", "東京",
+    "Hong Kong", "香港",
+    "Korea", "Seoul", "韓國", "首爾",
+    "Sydney", "Australia", "雪梨", "澳洲", "澳大利亞",
+    "Kuala Lumpur", "Malaysia", "馬來西亞", "吉隆坡",
+    "Bangkok", "Thailand", "泰國", "曼谷",
+)
 
 APAC_LINKEDIN_LOCS = (
     "Singapore", "Tokyo, Japan", "Hong Kong", "Seoul, South Korea",
