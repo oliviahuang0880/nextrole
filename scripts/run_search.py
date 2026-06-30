@@ -45,14 +45,24 @@ def collect_queries(cfg: dict, extra: list[str]) -> list[str]:
 
 
 def dedupe(jobs: list[dict]) -> list[dict]:
-    seen, out = set(), []
+    """雙鍵去重：URL 一樣 → 同筆；同來源+公司+職稱 → 也視為同筆。
+
+    後者是為了擋 LinkedIn 同職缺多次 listing（不同 job ID 但內容相同）。
+    """
+    seen_urls, seen_tuples, out = set(), set(), []
     for j in jobs:
-        key = (j.get("url") or "").strip() or (
-            j.get("source", ""), j.get("title", ""), j.get("company", ""),
-        )
-        if key in seen:
+        url = (j.get("url") or "").strip()
+        title = (j.get("title") or "").strip()
+        company = (j.get("company") or "").strip()
+        tup = (j.get("source", ""), title, company)
+        if url and url in seen_urls:
             continue
-        seen.add(key)
+        if title and company and tup in seen_tuples:
+            continue
+        if url:
+            seen_urls.add(url)
+        if title and company:
+            seen_tuples.add(tup)
         out.append(j)
     return out
 
@@ -316,7 +326,12 @@ def main():
     if args.from_cache and os.path.exists(JOBS_CACHE):
         with open(JOBS_CACHE, encoding="utf-8") as f:
             jobs = json.load(f)
-        print(f"從快取載入 {len(jobs)} 筆（未重爬），重新評分 …")
+        n_before = len(jobs)
+        jobs = dedupe(jobs)  # 套用最新去重規則，方便調規則後立刻看效果
+        if len(jobs) != n_before:
+            print(f"從快取載入 {n_before} 筆 → 重新去重後 {len(jobs)} 筆，重新評分 …")
+        else:
+            print(f"從快取載入 {len(jobs)} 筆（未重爬），重新評分 …")
     else:
         print("開始廣撒搜尋 104 / Cake / LinkedIn …")
         jobs = gather(cfg, args.max, args.queries)
