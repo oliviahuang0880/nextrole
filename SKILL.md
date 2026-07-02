@@ -257,6 +257,20 @@ cd ~/.claude/skills/nextrole/scripts && uv run run_search.py --queries <extra_qu
 
 **Skill 不設次數上限**，使用者自費 token，要找幾次都行。
 
+### 標出「今天才新出現」的職缺（✨）
+
+如果使用者定期重跑（例如每天/每週），可以自動標出「這次新出現、上次沒有」的職缺：
+
+```bash
+uv run run_search.py --diff-against auto
+```
+
+- `--diff-against auto` 會**自動挑 `./output` 裡最新一份舊 CSV** 來比對，本次新出現的職缺 URL 在 HTML 與 CSV 都會標 ✨。
+- 也可指定某份 CSV：`--diff-against ./output/results_<timestamp>.csv`。
+- 第一次跑（`output` 沒有舊 CSV）會自動略過、不報錯，全部不標 ✨；從第二次起才有意義。
+- stdout 完成行會多印「✨ 新出現 N 筆」。
+- 想每天無人值守自動跑，可搭配作業系統排程器（cron / launchd / Claude Code 的 scheduled task）呼叫這行指令。
+
 ## 重要原則
 
 - **中立搜尋**：使用者沒指定領域時用中立技能關鍵字搜尋。**不要**用「他是 X 行業」去判斷他適合哪些職缺，由分數呈現、由他決定。

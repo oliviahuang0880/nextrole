@@ -314,7 +314,8 @@ def main():
     ap.add_argument("--top", type=int, default=300, help="抓完整 JD 的候選數上限")
     ap.add_argument("--min-jd", type=int, default=250, help="完整 JD 最少字數")
     ap.add_argument("--diff-against", type=str, default=None,
-                    help="一份之前的 results CSV 路徑：本次新出現的 URL 會被標 ✨")
+                    help="一份之前的 results CSV 路徑：本次新出現的 URL 會被標 ✨；"
+                         "傳 'auto' 會自動挑 ./output 裡最新一份舊 CSV（每日跑最方便）")
     args = ap.parse_args()
 
     cfg = load_profile()
@@ -352,9 +353,21 @@ def main():
 
     scored.sort(key=lambda s: s["eval"]["score"], reverse=True)
 
+    diff_path: Path | None = None
+    if args.diff_against == "auto":
+        prev_csvs = sorted(Path(OUTPUT).glob("results_*.csv"))
+        if prev_csvs:
+            diff_path = prev_csvs[-1]
+            print(f"自動挑舊 CSV 對比：{diff_path.name}")
+    elif args.diff_against:
+        diff_path = Path(args.diff_against)
+        if not diff_path.exists():
+            print(f"⚠️  --diff-against 找不到檔案：{diff_path}，略過標記")
+            diff_path = None
+
     prev_urls: set[str] = set()
-    if args.diff_against and Path(args.diff_against).exists():
-        with open(args.diff_against, encoding="utf-8-sig") as f:
+    if diff_path:
+        with open(diff_path, encoding="utf-8-sig") as f:
             prev_urls = {r["連結"] for r in csv.DictReader(f) if r.get("連結")}
     for s in scored:
         s["is_new"] = bool(prev_urls) and (s["job"].get("url") or "") not in prev_urls
