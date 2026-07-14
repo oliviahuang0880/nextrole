@@ -1,10 +1,10 @@
-# NextRole — Claude Skill
+# NextRole — AI 求職盤點工具（Claude Code / Codex）
 
 > 求職盤點工具：用對話完成「天賦 + 技能」雙面向問卷 → 中立廣撒搜尋 104/Cake/LinkedIn → 評分 → 產出可篩選的 HTML 報表。
 
 對話跑問卷、Python 跑爬蟲評分。**預設台灣，也可選海外（亞太 / 全球 / 全遠端）**、資料只存使用者本機。
 
-## 安裝
+## 安裝（Claude Code）
 
 ```bash
 # 1. 裝 uv（Python 腳本執行器，~/3 秒一行指令）
@@ -17,6 +17,21 @@ git clone https://github.com/oliviahuang0880/nextrole.git ~/.claude/skills/nextr
 ```
 
 > 沒有 `git` 的話也可以下載 zip 解壓到 `~/.claude/skills/nextrole/`。
+
+## 在 Codex（或其他 AI 工具）使用
+
+```bash
+# clone 到任意位置
+git clone https://github.com/oliviahuang0880/nextrole.git
+cd nextrole
+codex   # 在 repo 資料夾內啟動（Codex 會自動讀 AGENTS.md）
+```
+
+然後對它說「幫我找工作」即可，流程跟 Claude Code 版相同。差異：
+
+- Codex 需要**在這個 repo 資料夾內**啟動才會載入指引（Claude Code 裝好後在任何資料夾都能觸發）
+- 爬蟲與評分引擎完全相同；問卷對話的細膩度取決於所用模型
+- Codex 端尚無大量實測，遇到問題歡迎開 issue
 
 ## 使用
 
@@ -40,9 +55,9 @@ cd output && python3 -m http.server 8765
 
 ## 需要
 
-- [Claude Code](https://docs.claude.com/claude-code)（或同等支援 skill 的環境）
-- [uv](https://docs.astral.sh/uv/)（skill 偵測到沒裝會問是否代裝）
-- **不需要** `ANTHROPIC_API_KEY` — AI 推理（彙整朋友描述、抽 JD 關鍵字）由對話的 Claude 處理
+- [Claude Code](https://docs.claude.com/claude-code)，或 [Codex](https://openai.com/codex/) 等會讀 `AGENTS.md` 的 AI 工具
+- [uv](https://docs.astral.sh/uv/)（偵測到沒裝會問是否代裝）
+- **不需要任何 API key** — AI 推理（彙整朋友描述、抽 JD 關鍵字）由對話中的 AI 助手處理
 
 ## 隱私
 

@@ -1,18 +1,11 @@
 """方法二（技能評估）問卷引擎。
 
-流程：AI 用情境題分批問 → 把 ~35 個技能分類成 On Fire / Heating Up / Burnout /
-Cold → 用 build_profile() 產出可直接餵給 score.py 的 keywords.json。
-
-開發期省 token：環境變數 FINDWORK_MOCK_AI（預設 "1"=開）時走腳本式假問答，
-不呼叫 Claude；上線前設 FINDWORK_MOCK_AI=0 並提供 ANTHROPIC_API_KEY 才走真 AI。
+流程：對話中的 AI 助手（Claude / Codex 等）用情境題逐一問 → 把 ~35 個技能分類成
+On Fire / Heating Up / Burnout / Cold → 用 build_profile() 產出可直接餵給
+score.py 的 keywords.json。問卷本身在對話中進行，本檔只負責題庫與 profile 組裝，
+不呼叫任何 AI API、不需要 API key。
 """
 from __future__ import annotations
-
-import json
-import os
-
-MODEL = os.environ.get("FINDWORK_MODEL", "claude-sonnet-4-6")
-MOCK_AI = os.environ.get("FINDWORK_MOCK_AI", "1") == "1"
 
 # ── 35 個技能（取自 profile/method2_skills_checklist.md）──
 # cat：A 分析 / B 管理 / C 人際 / D 創意
