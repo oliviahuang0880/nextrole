@@ -37,6 +37,20 @@ echo '<JSON>' | uv run build_profile.py    # write questionnaire results into th
 ## Requirements
 
 - [`uv`](https://docs.astral.sh/uv/) — the only dependency; scripts declare their own Python deps inline (PEP 723).
+- **No API keys, no `.env` file.** Nothing in this repo reads a `.env`, and there are no secrets to store.
+
+## Optional: proxy (when a job board blocks the crawler)
+
+If 104 / Cake / LinkedIn start returning errors or empty results (rate-limiting or IP blocks), the crawler can be routed through an HTTP proxy via environment variables — set them in the shell before running, no config file involved:
+
+```bash
+export PROXY_URL=http://user:pass@host:port        # sets both http and https
+# or override per-scheme:
+export PROXY_URL_HTTP=http://host:port
+export PROXY_URL_HTTPS=http://host:port
+```
+
+Unset (the default) means a direct connection. Handled in [`scripts/http_client.py`](scripts/http_client.py).
 
 ## Principles (same as SKILL.md)
 

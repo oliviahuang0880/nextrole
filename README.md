@@ -57,7 +57,20 @@ cd output && python3 -m http.server 8765
 
 - [Claude Code](https://docs.claude.com/claude-code)，或 [Codex](https://openai.com/codex/) 等會讀 `AGENTS.md` 的 AI 工具
 - [uv](https://docs.astral.sh/uv/)（偵測到沒裝會問是否代裝）
-- **不需要任何 API key** — AI 推理（彙整朋友描述、抽 JD 關鍵字）由對話中的 AI 助手處理
+- **不需要任何 API key，也不需要 `.env`** — AI 推理（彙整朋友描述、抽 JD 關鍵字）由對話中的 AI 助手處理
+
+### 選用：走 proxy（爬蟲被擋時）
+
+若 104 / Cake / LinkedIn 開始回錯誤或空結果（被限流或擋 IP），可以用環境變數讓爬蟲走 HTTP proxy——在 shell 裡設好再跑，不需要設定檔：
+
+```bash
+export PROXY_URL=http://user:pass@host:port        # http、https 都走這個
+# 或分別指定：
+export PROXY_URL_HTTP=http://host:port
+export PROXY_URL_HTTPS=http://host:port
+```
+
+不設（預設）就是直連。
 
 ## 隱私
 
