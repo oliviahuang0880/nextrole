@@ -53,6 +53,18 @@ cd output && python3 -m http.server 8765
 ```
 **不要用 `file://` 開**，職缺連結會空白（瀏覽器安全機制）。
 
+## 報表長什麼樣
+
+**推薦區**：達門檻的職缺依分數排序，每筆看得到技能／天賦兩個子分與命中的關鍵字——分數怎麼來的一目瞭然，不是黑盒推薦。
+
+![推薦職缺區：依總分排序，含技能／天賦子分與命中關鍵字](docs/report-recommended.png)
+
+**廣泛清單**：撈到的全部職缺，可依來源（104 / Cake / LinkedIn）篩選。
+
+![廣泛清單：全部職缺並可依來源篩選](docs/report-filter.png)
+
+> 截圖用的是示範 profile（通用技能關鍵字），不是任何真實使用者的問卷結果；職缺為公開招募資訊。
+
 ## 需要
 
 - [Claude Code](https://docs.claude.com/claude-code)，或 [Codex](https://openai.com/codex/) 等會讀 `AGENTS.md` 的 AI 工具
