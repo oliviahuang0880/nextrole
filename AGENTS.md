@@ -17,6 +17,22 @@ The full conversational playbook is [`SKILL.md`](SKILL.md) (written in Tradition
    ```
 3. **Ignore the skill trigger-phrase machinery** (the YAML frontmatter). The user simply saying "help me find a job" / 「幫我找工作」 is your cue to start the SKILL.md flow from step 1.
 
+`SKILL.md` is deliberately a thin SOP skeleton. The detailed criteria live in [`rules/`](rules/) and the fixed output formats in [`templates/`](templates/) — **read them on demand**, at the step that cites them, not all up front:
+
+| File | Read it at |
+|---|---|
+| `rules/環境偵測與降級模式判準.md` | Phase 0 — uv detection, degraded mode |
+| `rules/技能問卷對話節奏判準.md` | Phase 3 — progress bar, per-question scenarios, option wording |
+| `rules/提問與選項撰寫判準.md` | Phase 4 — Context + one question + option table + Others |
+| `rules/中立與加權判準.md` | Phase 4 — neutrality, `field_terms` vs `extra_queries`, negative-term format |
+| `rules/搜尋結果健檢判準.md` | Phase 5 — what each health-check code means and what to tell the user |
+| `templates/keywords-report.md` | Phase 3 — the keyword listing |
+| `templates/search-summary.md` | Phase 5 — the search report |
+
+Each template has a matching `.example.md` showing it filled in.
+
+**Health check:** `run_search.py` ends with a `━━━ 健檢 ━━━` block and a final `健檢代碼：<CODE>,…` line. A zero exit code does **not** mean the result is healthy — read the codes and follow `rules/搜尋結果健檢判準.md` before telling the user it worked.
+
 ## Quick command reference
 
 ```bash

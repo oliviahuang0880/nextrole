@@ -130,7 +130,16 @@ def passes_filter(job: dict, cfg: dict) -> bool:
     return False
 
 
-def gather(cfg: dict, max_per: int, extra: list[str]) -> list[dict]:
+def source_counts(jobs: list[dict]) -> dict[str, int]:
+    c: dict[str, int] = {}
+    for j in jobs:
+        k = j.get("source") or "?"
+        c[k] = c.get(k, 0) + 1
+    return c
+
+
+def gather(cfg: dict, max_per: int, extra: list[str]) -> tuple[list[dict], dict[str, int]]:
+    """回傳 (去重後職缺, 各站原始筆數)。後者讓健檢分得出「沒撈到」和「某站掛了」。"""
     queries = collect_queries(cfg, extra)
     regions = cfg.get("filters", {}).get("regions", ["tw"])
     all_jobs: list[dict] = []
@@ -149,7 +158,7 @@ def gather(cfg: dict, max_per: int, extra: list[str]) -> list[dict]:
         if "remote" in regions:
             all_jobs.extend(search_linkedin(q, max_jobs=30, pages=3, location="", f_wt=2))
         time.sleep(1.5)
-    return dedupe(all_jobs)
+    return dedupe(all_jobs), source_counts(all_jobs)
 
 
 def enrich_and_filter(jobs: list[dict], cfg: dict, top_n: int, min_jd: int) -> list[dict]:
@@ -305,6 +314,85 @@ def write_csv(scored: list[dict], path: str):
             ])
 
 
+def expected_sources(cfg: dict) -> list[str]:
+    """依 regions 推出這次「應該」要有結果的站，用來判斷是不是某站掛了。"""
+    regions = cfg.get("filters", {}).get("regions", ["tw"])
+    srcs = ["Cake"]  # Cake 不分地區，一定會跑
+    if "tw" in regions:
+        srcs.insert(0, "104")
+    if any(r in regions for r in ("tw", "apac", "global", "remote")):
+        srcs.append("LinkedIn")
+    return srcs
+
+
+def health_check(cfg: dict, queries: list[str], raw_counts: dict[str, int],
+                 n_enriched: int, scored: list[dict], html_path: str,
+                 csv_path: str, from_cache: bool) -> list[str]:
+    """印出人看得懂的健檢區塊，並回傳代碼清單給對話中的 agent 判讀。
+
+    刻意不 raise、不改 exit code：排程每天跑時不該因為「這次沒撈到」而爆掉，
+    但也不能讓 agent 以為「指令沒報錯 = 結果健康」。代碼對照見
+    rules/搜尋結果健檢判準.md。
+    """
+    codes: list[str] = []
+    lines: list[str] = []
+    threshold = cfg.get("scoring", {}).get("threshold", 60)
+    rec = sum(1 for s in scored if s["eval"]["recommended"])
+    top = max((s["eval"]["score"] for s in scored), default=0)
+    n_raw = sum(raw_counts.values())
+
+    if not queries:
+        codes.append("NO_QUERIES")
+        lines.append("profile 裡沒有任何搜尋詞（method2_positive 沒有 q:true 的項目）。")
+
+    if n_raw == 0:
+        codes.append("NO_RAW")
+        lines.append("三站合計撈到 0 筆 — 網路不通，或三站同時擋爬蟲。")
+    elif not from_cache:
+        for src in expected_sources(cfg):
+            if raw_counts.get(src, 0) == 0:
+                codes.append(f"SOURCE_DEAD:{src}")
+                lines.append(f"{src} 撈到 0 筆，其他站正常 — 該站可能改版或擋了；"
+                             f"這份結果不含 {src}。")
+
+    if n_raw > 0 and len(scored) == 0:
+        codes.append("ALL_FILTERED")
+        f = cfg.get("filters", {})
+        lines.append(
+            f"撈到 {n_raw} 筆，但被條件濾到 0 筆。"
+            f"目前 regions={f.get('regions', ['tw'])}、"
+            f"allowed_cities={f.get('allowed_cities', []) or '（不限）'}、"
+            f"負向詞 {len(cfg.get('negative', []))} 個。"
+        )
+    elif 0 < len(scored) < 10:
+        codes.append("THIN_RESULT")
+        lines.append(f"只有 {len(scored)} 筆，樣本偏少 — 可考慮放寬地區或加搜尋詞。")
+
+    if len(scored) > 0 and rec == 0:
+        codes.append("NO_RECOMMENDED")
+        lines.append(f"有 {len(scored)} 筆結果但推薦區 0 筆：最高分 {top} 分，門檻 {threshold} 分。")
+
+    for p in (html_path, csv_path):
+        if not os.path.exists(p) or os.path.getsize(p) == 0:
+            codes.append("NO_OUTPUT")
+            lines.append(f"產物沒寫出來或是空檔：{p}")
+            break
+
+    if not codes:
+        codes.append("OK")
+        lines.append(f"正常：{len(scored)} 筆、推薦 {rec} 筆、最高分 {top} 分。")
+
+    print("\n━━━ 健檢 ━━━")
+    print(f"  搜尋詞 {len(queries)} 個"
+          f"{'（本次用快取，未重爬）' if from_cache else ''}")
+    print(f"  各站原始筆數：{'、'.join(f'{k}={v}' for k, v in sorted(raw_counts.items())) or '無'}")
+    print(f"  完整 JD 後 {n_enriched} 筆 → 過濾評分後 {len(scored)} 筆 → 推薦 {rec} 筆")
+    for ln in lines:
+        print(f"  • {ln}")
+    print(f"健檢代碼：{','.join(codes)}")
+    return codes
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--max", type=int, default=25, help="每站每關鍵字抓取上限")
@@ -324,6 +412,12 @@ def main():
 
     os.makedirs(OUTPUT, exist_ok=True)
 
+    queries = collect_queries(cfg, args.queries)
+    if not queries:
+        print("⚠️  profile 裡沒有任何搜尋詞（method2_positive 沒有 q:true 的項目）。")
+        print("健檢代碼：NO_QUERIES")
+        raise SystemExit("沒有搜尋詞可用 — 請先跑完技能問卷，或手動標幾個技能為搜尋詞。")
+
     if args.from_cache and os.path.exists(JOBS_CACHE):
         with open(JOBS_CACHE, encoding="utf-8") as f:
             jobs = json.load(f)
@@ -333,15 +427,17 @@ def main():
             print(f"從快取載入 {n_before} 筆 → 重新去重後 {len(jobs)} 筆，重新評分 …")
         else:
             print(f"從快取載入 {len(jobs)} 筆（未重爬），重新評分 …")
+        raw_counts = source_counts(jobs)
     else:
         print("開始廣撒搜尋 104 / Cake / LinkedIn …")
-        jobs = gather(cfg, args.max, args.queries)
+        jobs, raw_counts = gather(cfg, args.max, args.queries)
         print(f"去重後共 {len(jobs)} 筆。")
         jobs = enrich_and_filter(jobs, cfg, top_n=args.top, min_jd=args.min_jd)
         with open(JOBS_CACHE, "w", encoding="utf-8") as f:
             json.dump(jobs, f, ensure_ascii=False)
         print(f"已快取 {len(jobs)} 筆（含完整 JD），評分中 …")
 
+    n_enriched = len(jobs)
     scored = []
     for j in jobs:
         if not passes_filter(j, cfg):
@@ -383,6 +479,9 @@ def main():
     print(f"  CSV ：{csv_path}")
     print(f"\n看 HTML：cd {OUTPUT} && python3 -m http.server 8765")
     print(f"  → 開 http://localhost:8765/results_{stamp}.html（不要用 file://，連結會空白）")
+
+    health_check(cfg, queries, raw_counts, n_enriched, scored,
+                 html_path, csv_path, from_cache=args.from_cache)
 
 
 if __name__ == "__main__":

@@ -5,290 +5,116 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 
 # NextRole — 求職盤點 Skill（台灣／亞太／全球／遠端）
 
-幫使用者透過對話完成「天賦＋技能」雙面向問卷，產出個人化關鍵字檔，自動搜尋 104/Cake/LinkedIn 並評分。**預設台灣，也可選海外/全球/遠端**。
+幫使用者透過對話完成「天賦＋技能」雙面向問卷，產出個人化關鍵字檔，自動搜尋 104/Cake/LinkedIn 並評分。
+
+本 skill 必須自足執行，只依使用者指示、本 skill 的 `rules/`、`templates/`、`references/`、`examples/` 與 `scripts/`。細節判準一律寫在 `rules/`，輸出格式一律寫在 `templates/`，**用到才讀**。
+
+## Output Contract
+
+- 唯一持久產物是 `~/.nextrole/profile.json`（覆寫前 `profile_io.py` 會自動備份一份 `profile.<UTC ts>.json`）。
+- 搜尋產出是執行目錄下的 `./output/results_<ts>.html` + `.csv`，以及重算用的 `./output/_jobs_cache.json`。
+- `profile.json` 只放長期偏好：關鍵字、權重、`filters`、`negative`、`scoring`。**不得**寫入單次執行才用的東西（`extra_queries` 只當次有效）。
+- 所有資料留在使用者本機，不上傳。不需要也不得要求 `ANTHROPIC_API_KEY`。
+- 對話輸出有兩個固定格式：關鍵字清單用 `templates/keywords-report.md`，搜尋回報用 `templates/search-summary.md`。兩者都不得殘留 `{{...}}` 填位符號。
+- 未收到使用者對 Phase 4 提問的回答前，不得寫入 `profile.json`，也不得開始搜尋。
 
 ## 流程順序（嚴格遵守）
 
 ```
-[起點] → ① 天賦問卷（可跳過）
-       → ② 技能問卷（35 題，必做，不可跳）
-       → ③ 進階偏好（地區必填、領域/JD 選填）
-       → ④ 搜尋並產出 HTML
+[Phase 0] 環境偵測 → [Phase 1] 起點 → [Phase 2] 天賦問卷（可跳過）
+        → [Phase 3] 技能問卷（35 題，必做）→ [Phase 4] 進階偏好 → [Phase 5] 搜尋與回報
 ```
 
-跳過天賦問卷時直接接 ②。重來時讀已存的 profile，可只跑 ③④。
+跳過天賦問卷時直接接 Phase 3。重來時讀已存的 profile，可只跑 Phase 4–5。
 
-## 0. 環境偵測（每次啟動先做）
+# SOP
 
-跑 `command -v uv` 判斷：
-- **有 uv** → 走完整模式（跑爬蟲）
-- **沒有 uv 但有 bash** → 詢問「我可以幫你裝 uv 嗎？這是個免費工具，會幫你跑 Python 腳本，一行指令裝完：`curl -LsSf https://astral.sh/uv/install.sh | sh`。同意嗎？」同意就跑、不同意走降級模式。
-- **完全沒 bash（claude.ai 網頁/桌面 app）** → **降級模式**：只用對話跑問卷（②），最後輸出關鍵字 JSON ＋ 三個站的搜尋網址清單貼到瀏覽器（步驟 4 改用 `references/method2_skills.json` 純對話、步驟 6 改成貼網址）。
+## Phase 0 -- 環境偵測
 
-## 1. 起點選擇
+1. READ 讀取 `rules/環境偵測與降級模式判準.md`，跑 `command -v uv` 判斷完整模式或降級模式。
+2. THINK 若沒有 `uv` 但有 bash，依規則詢問使用者是否同意安裝；未同意前不得執行安裝指令。
+3. THINK 確認本次走完整模式或降級模式，後續 Phase 3 收尾與 Phase 5 的做法依此分流。
 
-打招呼後問：
+## Phase 1 -- 起點選擇
 
-> 「歡迎用 NextRole！流程是這樣：先做天賦問卷（請 5–6 位認識你的人寫『你眼中的我』，幾分鐘到幾天看你怎麼安排），再做技能問卷（~35 題情境式自評，10 分鐘左右），最後搜尋。
->
-> 想先做天賦問卷嗎？也可以**跳過直接做技能問卷**。」
+1. READ 檢查 `~/.nextrole/profile.json` 是否存在，確認是首次執行還是回訪。
+2. WRITE 打招呼並說明流程：
 
-如果 `~/.nextrole/profile.json` 已存在，多問一句：「你之前做過了。想直接重新搜尋，還是重做問卷？」
+   > 「歡迎用 NextRole！流程是這樣：先做天賦問卷（請 5–6 位認識你的人寫『你眼中的我』，幾分鐘到幾天看你怎麼安排），再做技能問卷（~35 題情境式自評，10 分鐘左右），最後搜尋。
+   >
+   > 想先做天賦問卷嗎？也可以**跳過直接做技能問卷**。」
 
-## 2. 天賦問卷（貼上模式，可跳過）
+3. WRITE 若 profile 已存在，多問一句：「你之前做過了。想直接重新搜尋，還是重做問卷？」選前者就跳到 Phase 4。
 
-如果使用者選擇做：
+## Phase 2 -- 天賦問卷（可跳過）
 
-1. 讀 `examples/invitation_template.md`，把預設邀請文字唸給使用者，請他複製傳給 5–6 位**認識他的人**。
-2. 提醒「不急，可以慢慢等回覆。回來貼給我就行」。
-3. **使用者貼回朋友回覆**（一則一則或一次全貼都行）。每收到一則簡短確認「收到 N 則了」。
-4. 收到 ≥ 3 則後使用者說「彙整」或 ≥ 5 則時主動詢問「夠了要彙整嗎？」。
-5. **由你（對話的 Claude）直接彙整**，不要呼叫任何 Anthropic API：
-   - 任務：把所有回覆濃縮成 6–10 個**最常被提到**的共通天賦或特質，繁體中文短詞（單詞或短語、不要句子、不要公司名/人名/地名）。
-   - 輸出 JSON 陣列（不要用 markdown code fence）：
-     ```json
-     [{"term":"傾聽溝通","en":"communication","weight":2},
-      {"term":"分析判斷","en":"analysis","weight":2}, ...]
-     ```
-6. 把 JSON 寫到 `/tmp/talents.json`，跑：
-   ```bash
-   cd ~/.claude/skills/nextrole/scripts && uv run merge_talents.py /tmp/talents.json
+1. READ 讀取 `examples/invitation_template.md`，把邀請文字唸給使用者，請他複製傳給 5–6 位**認識他的人**，並提醒「不急，可以慢慢等回覆，回來貼給我就行」。
+2. READ 接收使用者貼回的朋友回覆（一則一則或一次全貼都行），每收到一則簡短確認「收到 N 則了」。
+3. THINK 收到 ≥ 3 則且使用者說「彙整」，或 ≥ 5 則時主動詢問「夠了要彙整嗎？」，再由**你自己**把所有回覆濃縮成 6–10 個最常被提到的共通天賦（繁體中文短詞，不要句子／公司名／人名／地名）。不得呼叫任何外部 AI API。
+4. WRITE 把彙整結果寫成 `/tmp/talents.json`（JSON 陣列，不要 code fence）：
+
+   ```json
+   [{"term":"傾聽溝通","en":"communication","weight":2},
+    {"term":"分析判斷","en":"analysis","weight":2}]
    ```
-7. 列出彙整出來的天賦給使用者看，接著進入 ③ 技能問卷。
 
-## 3. 技能問卷（35 題，必做）
+5. WRITE 跑 `cd ~/.claude/skills/nextrole/scripts && uv run merge_talents.py /tmp/talents.json`，列出彙整出的天賦給使用者看，接著進 Phase 3。
 
-讀 `references/method2_skills.json`。它有 6 組（rounds），每組有情境句 + 一組技能。
+## Phase 3 -- 技能問卷（35 題，必做，不可跳）
 
-### 對話節奏（重要）
+1. READ 讀取 `rules/技能問卷對話節奏判準.md` 與 `references/method2_skills.json`，確認 6 組情境、題目節奏、進度條與選項客製化的硬性要求。
+2. WRITE 依已載入規則逐題提問，內部累積 `classifications` 與 `notes`，過程中不把這兩包 dump 給使用者。
+3. WRITE 問完 35 題後把結果餵進 profile：
 
-- **進入新組時**，先把 `scenario` 情境句唸給使用者一次。
-- **每一題都要再寫一個更具體的小情境**（不只是把組情境貼過來），並把 4 個選項用該題情境的語言「客製」描述，不要只列名稱。
-- **每題都要顯示進度條**（10 字寬 ASCII，▓ 填、░ 空），放在「Q N.」上方一行：
-  - 公式：`filled = max(1, round(10 * Q / 35))`；剩下用 ░ 補滿
-  - 範例：
-    ```
-    ▓░░░░░░░░░  1/35
-    ▓▓░░░░░░░░  5/35
-    ▓▓▓░░░░░░░ 10/35
-    ▓▓▓▓▓░░░░░ 17/35
-    ▓▓▓▓▓▓▓▓░░ 28/35
-    ▓▓▓▓▓▓▓▓▓▓ 35/35
-    ```
-  - 用意：讓使用者隨時知道還剩幾題，減少「這還要做多久」的疲勞感
-- 每題格式：
-  > `▓░░░░░░░░░  1/35`
-  >
-  > **Q1.「研究」**
-  > 情境：老闆丟你一個全新的題目「我們要不要做這個產品？」，沒有人做過，也沒有資料。你要去訪談使用者、查競品、看市場報告，把事情查到水落石出。
-  >
-  > 1️⃣ **On Fire** — 一頭栽進去查到忘記吃飯，這種題目最有趣
-  > 2️⃣ **Heating Up** — 做得還不夠扎實，但很想練到能獨立扛這種題目
-  > 3️⃣ **Burnout** — 查得來，但常做會累，比較想偶爾為之
-  > 4️⃣ **Cold** — 看到一堆未知資訊就頭大，能不查就不查
-  >
-  > 💬 也可以描述實際工作情境，我幫你判斷。
-- 不可以省略情境、選項描述或進度條，即使第二題之後也一樣。每組組情境句也要每題重貼在問題上方（用引用 quote 即可），讓使用者隨時看得到當下情境。
-- 使用者回 1/2/3/4 → 立刻問下一題。
-- 使用者打文字描述工作情境而不是 1/2/3/4 時 → 你來判斷分類，回覆「判定為 X — 理由」再接下一題。
-- 每組結束問一次：「這組（XX類）有沒有想補充的？例如某個技能跟特定領域連在一起？沒有就回『沒有』」存到 notes。
+   ```bash
+   cd ~/.claude/skills/nextrole/scripts && echo '{"classifications": {...}, "notes": {...}}' | uv run build_profile.py
+   ```
 
-### 內部累積（不給使用者看）
+   降級模式沒有 `uv`，改依 `rules/環境偵測與降級模式判準.md` 的替代路徑處理。
+4. READ 讀取 `templates/keywords-report.md` 與 `templates/keywords-report.example.md`。
+5. WRITE 依樣板**主動**列出方法一天賦、方法二技能（標 🔍 = 會拿去搜尋）、負向詞與 JD 補充詞。這是強制動作，不要等使用者問。
 
-- `classifications`: `{<skill_key>: "on_fire"|"heating"|"burnout"|"cold"}`
-- `notes`: `{<round_category>: "補充文字"}`
+## Phase 4 -- 進階偏好
 
-### 完成後
+1. READ 讀取 `rules/提問與選項撰寫判準.md` 與 `rules/中立與加權判準.md`，確認提問格式、推薦選項的禁區與三種加權機制的分工。
+2. WRITE 問 **4a 地區**（必填、無預設、可複選）：台灣／亞太／全球／全遠端。含台灣要追問哪些城市。依答案寫入 `filters.regions`（`tw`/`apac`/`global`/`remote`）與 `filters.allowed_cities`；`filters.allow_remote` 維持 `true`。提醒亞太會掃 7 個城市、整跑約 5–8 分鐘。
+3. WRITE 問 **4b 領域偏好**（選填，影響**評分**）。有填 → 由你生 8–15 個該領域的技能／工具／職能詞，列給使用者確認後寫進 `field_terms`（`weight: 3`）並把 `scoring.use_field_terms` 設 `true`。不填 → 維持 `false`，純通用能力評分。**這題不得標推薦選項。**
+4. WRITE 問 **4c 貼有興趣的 JD**（選填，影響**搜尋**）。抽 5–8 個中立技能／領域詞，列給使用者確認後併進本次的 `extra_queries`，不寫進 profile。
+5. WRITE 問 **4d 負向詞**（必問）。先講清楚「職稱命中→整筆剔除／內文命中→扣分」的差別，再給 A–H 選項讓使用者複選或自由填答。依 `rules/中立與加權判準.md` Rule 4 的格式寫入 `negative`；使用者回「沒有」就完全不動。
+6. THINK 確認每一題都已收到使用者回答；有任何一題還沒回答就停在這裡，不得往下走。用 `python3` 直接改 `~/.nextrole/profile.json` 即可，不用另寫腳本。
 
-把 classifications + notes 用 JSON 透過 stdin 寫進 `build_profile.py`：
-```bash
-cd ~/.claude/skills/nextrole/scripts && echo '<JSON>' | uv run build_profile.py
-```
-JSON 結構：`{"classifications": {...}, "notes": {...}}`
+## Phase 5 -- 搜尋與回報
 
-成功後 `~/.nextrole/profile.json` 已更新（含天賦問卷的 talents 自動合併）。
+1. WRITE 執行搜尋（爬蟲約 1–3 分鐘，選亞太約 5–8 分鐘）：
 
-### 完成後要主動列關鍵字給使用者看
+   ```bash
+   cd ~/.claude/skills/nextrole/scripts && uv run run_search.py --queries <extra_queries...>
+   ```
 
-跑完 `build_profile.py` 後（不要等使用者問）立刻列出：
+   降級模式改跑 `uv run browser_urls.py` 印三站搜尋網址讓使用者自己貼到瀏覽器。
+2. READ 讀取 `rules/搜尋結果健檢判準.md`，對照 stdout 最後一行的 `健檢代碼：`，判斷這次結果是否健康。
+3. READ 讀取 `templates/search-summary.md` 與 `templates/search-summary.example.md`。
+4. WRITE 依樣板回報筆數、來源分佈、健檢結論與具體建議、開啟方式（**必須提醒不要用 `file://`**）。健檢代碼不是 `OK` 時，不得用「完成」的語氣草草帶過。
+5. READ 回頭檢查回報內容有無殘留填位符號、有無違反 `rules/中立與加權判準.md`（例如替使用者推測該走哪個領域）；不符合就立即修正。
 
-1. **方法一：天賦關鍵字** — 從 `method1_positive` 讀，附權重（⭐ 數量）
-2. **方法二：技能關鍵字** — 從 `method2_positive` 讀，分 🔥 On Fire / ♨️ Heating Up 兩段，每個技能旁邊用 🔍 標出 `q:true` 的（這些才會被拿去三站搜尋）
-3. **Burnout / Cold** — 從 `negative` 讀，說明會扣分或排除
-4. **JD 抽出的補充關鍵字**（如果有跑步驟 4c）
+## Phase 6 -- 重新找一次（回訪時）
 
-範例輸出格式參考：
-
-```
-━━━ 方法一：天賦關鍵字（朋友彙整 N 個）━━━
-  ⭐⭐⭐ 傾聽溝通
-  ⭐⭐ 協調化解
-  ...
-
-━━━ 方法二：技能關鍵字 ━━━
-🔥 On Fire
-  🔍 研究
-     管理人員
-♨️ Heating Up
-  🔍 規劃
-     做決策
-（🔍 = 會拿去三站搜尋的關鍵字）
-```
-
-這是強制動作，每次跑完問卷都要做。
-
-## 4. 進階偏好
-
-依序問三題：
-
-### 4a. 地區（必填，無預設，可複選）
-> 「想找哪裡的工作？（可複選，用逗號或空格分開）
->
-> 1️⃣ 台灣 — 台北/新北/桃園/新竹/台中/高雄⋯（會再追問哪些城市）
-> 2️⃣ 亞太 — Singapore / Tokyo / Hong Kong / Seoul / Sydney / KL / Bangkok
-> 3️⃣ 全球 — 不限地點，撈各國
-> 4️⃣ 全遠端 — 只要 Remote 職缺
->
-> 例：『1, 4』= 台灣＋全遠端」
-
-依答案寫入 profile 的 `filters.regions`（陣列）。對應 key：`tw` / `apac` / `global` / `remote`。
-
-- 含 `1`（台灣）→ 追問「台灣哪些城市？」寫入 `filters.allowed_cities`（陣列，空陣列 = 全台不過濾）。
-- 不含 `1` → `allowed_cities` 留空 `[]`。
-- `filters.allow_remote` 預設 `true`（任何 region 都收遠端職缺）。
-
-用 `python3` 直接修改 `~/.nextrole/profile.json` 即可（小改動，不用另寫腳本）。
-
-**提醒使用者**：選 `2`（亞太）會掃 7 個亞太城市，整跑約 5–8 分鐘；選 `3` 或 `4` 通常 2–3 分鐘。
-
-### 4b. 領域偏好（選填，影響「評分」）
-> 「想偏向某個領域嗎？例如 UX、PM、行銷、data analyst⋯
->
-> ✏️ **有填某個領域** → 命中該領域關鍵字的職缺分數會變高、排前面
-> ⏭️ **不填（通用能力評分）** → 用研究、分析、規劃、協作、解決問題等**通用能力**打分，不替你預設方向；分數高的職缺 = 各種能力跟你最像的工作，可能跨多個產業」
-
-有填 → **由你（對話的 Claude）直接生 8–15 個該領域常見的技能/工具/職能詞**（繁體中文，例如填「UX」抽出：使用者體驗、UX、使用者研究、互動設計、線框、Figma、可用性測試⋯）。列給使用者確認後：
-- 寫進 profile 的 `field_terms`（每個 `weight: 3`）
-- 把 `scoring.use_field_terms` 改為 `true`
-- 提醒「加了之後評分會偏向這方向，命中這些詞分數會變高」
-
-不填 → 維持 `use_field_terms = false`，純通用能力評分。
-
-### 4c. 貼有興趣的 JD（選填，影響「搜尋」）
-> 「如果你最近有看到喜歡的職缺，把職缺描述貼給我（一段、多段、多則都行），我從裡面抽出搜尋關鍵字。」
-
-收到 JD 文字後：
-- **由你（對話的 Claude）直接抽 5–8 個中立技能/領域關鍵字**（繁體中文，不要公司名/地名）
-- 列給使用者確認：「我抽到這些：研究、產品策略、跨部門協作⋯ 要全部加入嗎？還是挑幾個？」
-- 確認後合併進 `extra_queries`（只用於這次搜尋，不寫進 profile）
-
-### 4b 跟 4c 的差別（內部 cheat sheet）
-
-- **4b → `field_terms`** = 評分加分（已撈到的職缺，命中該詞分數變高）
-- **4c → `extra_queries`** = 拓寬搜尋（去三站撈得到哪些職缺）
-
-兩個做不同層次的事，不衝突也不重疊。
-
-### 4d. 負向詞 / 排除題（必問，每個使用者都要問）
-
-**沒有預設負向詞**——這個 skill 不替使用者預設「實習/兼職/電話銷售」等該不該排除，由使用者自己決定。
-
-問法（先講影響、再給範例、最後接受自由填答）：
-
-> 「最後一題：有什麼**職稱或工作類型**你看到就想直接跳過？
->
-> 這些叫『負向詞』，影響方式是：
-> - 出現在**職稱**裡 → 整筆直接剔除（不會出現在結果列表）
-> - 只出現在 JD 內文 → **扣分**（會排到清單後面，但仍看得到）
->
-> 常見可排除項（可複選、可全不選、也可自己加）：
-> A. 實習 / Internship
-> B. 兼職 / Part-time
-> C. 工讀
-> D. 約聘 / Contractor
-> E. 自由接案 / Freelance
-> F. 顧問 / Consultant
-> G. 電話銷售 / Telesales（這個無論職稱或內文出現都直接剔除）
-> H. 其他：請自由打字（例：『都市規劃』『土木』『MLM』）
->
-> 例：『A, B, G』= 排除實習、兼職、電話銷售；或直接『沒有』跳過。」
-
-寫入規則（直接改 `~/.nextrole/profile.json` 的 `negative` 陣列）：
-
-- A–F 與 H 自由打字項 → 寫成 `{"term": "<中文>", "en": "<英文>", "exclude_if_title": True}`
-- G「電話銷售/Telesales」→ 寫成 `{"term": "電話銷售", "en": "telesales", "exclude": True}`（任何地方命中即剔除）
-- A–G 的英文已知對照表：
-
-  | 選項 | term | en |
-  |---|---|---|
-  | A | 實習 | intern |
-  | B | 兼職 | part-time |
-  | C | 工讀 | (無) |
-  | D | 約聘 | contractor |
-  | E | 自由接案 | freelance |
-  | F | 顧問 | consultant |
-  | G | 電話銷售 | telesales |
-
-- H 使用者打的中文詞 → **由你（對話的 Claude）順手補英文翻譯**寫進 `en`；若使用者直接打英文，`term` 就放英文、`en` 留空。
-- **使用者回「沒有」、空字串、或全不勾 → profile 的 `negative` 不動，零負向詞。**
-
-## 5. 執行搜尋
-
-```bash
-cd ~/.claude/skills/nextrole/scripts && uv run run_search.py --queries <extra_queries...>
-```
-
-爬蟲跑 1–3 分鐘。完成後告訴使用者：
-- 共撈到 N 筆、推薦 M 筆
-- 開啟方式（**必須提醒不要用 file://**）：
-  ```bash
-  cd output && python3 -m http.server 8765
-  ```
-  然後開 `http://localhost:8765/results_<timestamp>.html`
-
-降級模式：跑 `uv run browser_urls.py` 印出三個站的搜尋網址清單給使用者貼到瀏覽器。
-
-## 6. 重新找一次
-
-使用者下次回來說「我要重新找職缺」時：
-- `~/.nextrole/profile.json` 已存在 → 跳到步驟 4（重新問地區/領域/JD）
-- 或者「不調整關鍵字、只想重抓新職缺」→ 直接 `uv run run_search.py`
-- 或者「只調整關鍵字重算、不重抓」→ `uv run run_search.py --from-cache`
-
-**Skill 不設次數上限**，使用者自費 token，要找幾次都行。
-
-### 標出「今天才新出現」的職缺（✨）
-
-如果使用者定期重跑（例如每天/每週），可以自動標出「這次新出現、上次沒有」的職缺：
-
-```bash
-uv run run_search.py --diff-against auto
-```
-
-- `--diff-against auto` 會**自動挑 `./output` 裡最新一份舊 CSV** 來比對，本次新出現的職缺 URL 在 HTML 與 CSV 都會標 ✨。
-- 也可指定某份 CSV：`--diff-against ./output/results_<timestamp>.csv`。
-- 第一次跑（`output` 沒有舊 CSV）會自動略過、不報錯，全部不標 ✨；從第二次起才有意義。
-- stdout 完成行會多印「✨ 新出現 N 筆」。
-- 想每天無人值守自動跑，可搭配作業系統排程器（cron / launchd / Claude Code 的 scheduled task）呼叫這行指令。
-
-## 重要原則
-
-- **中立搜尋**：使用者沒指定領域時用中立技能關鍵字搜尋。**不要**用「他是 X 行業」去判斷他適合哪些職缺，由分數呈現、由他決定。
-- **不需要 ANTHROPIC_API_KEY**：彙整朋友描述、抽 JD 關鍵字都由你（對話的 Claude）做。
-- **資料本機**：所有 profile 存在使用者本機 `~/.nextrole/`，沒有上傳。
-- **覆蓋自動備份**：`profile_io.py` 在覆蓋 profile.json 前會自動 cp 一份 `profile.<UTC ts>.json`。
-- **地區彈性**：預設台灣（104 + Cake + LinkedIn TW），4a 可選海外/亞太/全球/全遠端，海外模式時 104 自動跳過、LinkedIn 改撈對應地點。
+1. THINK 判斷使用者要重做到哪一步：
+   - 想調整地區／領域／JD → 回 Phase 4。
+   - 只想重抓新職缺 → `uv run run_search.py`。
+   - 只想調關鍵字重算、不重爬（最快，約 5 秒）→ `uv run run_search.py --from-cache`。
+2. WRITE 定期重跑時加 `--diff-against auto`，會自動挑 `./output` 裡最新一份舊 CSV 比對，本次新出現的職缺在 HTML 與 CSV 都標 ✨。第一次跑沒有舊 CSV 會自動略過、不報錯。
+3. THINK Skill 不設次數上限，使用者自費 token，要找幾次都行。想無人值守可搭配 cron / launchd / scheduled task 呼叫上面那行。
 
 ## 檔案位置摘要
 
-- Skill 本體：`~/.claude/skills/nextrole/`
-- 使用者 profile：`~/.nextrole/profile.json`（含備份）
-- 搜尋產出：`./output/results_<ts>.html` + `.csv`（執行 claude 時的當前目錄下）
-- 搜尋快取（重算用）：`./output/_jobs_cache.json`
+- Skill 本體：`~/.claude/skills/nextrole/`（判準在 `rules/`、輸出格式在 `templates/`）
+- 使用者 profile：`~/.nextrole/profile.json`（含自動備份）
+- 搜尋產出：`./output/results_<ts>.html` + `.csv`；快取 `./output/_jobs_cache.json`
 - 參考資料：`references/method2_skills.json`、`examples/invitation_template.md`
 
 ## 已知地雷
 
-- HTML 結果**不能用 file:// 開**，職缺連結會空白（瀏覽器安全機制）。必須用 `python3 -m http.server`。
-- Cake / LinkedIn 改版時可能爬不到，先 ship、壞了砍 Cake/LinkedIn 改剩 104。
-- 搜尋會 sleep 1.5 秒節流避免被擋（每個關鍵字三站）。
+- HTML 結果**不能用 `file://` 開**，職缺連結會空白。必須用 `python3 -m http.server`。
+- Cake / LinkedIn 改版時可能爬不到 — 健檢會回 `SOURCE_DEAD:<站名>`，照 `rules/搜尋結果健檢判準.md` 處理。
+- 搜尋每個關鍵字跑三站後 sleep 1.5 秒節流，避免被擋。
