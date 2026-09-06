@@ -385,6 +385,14 @@ window.NR = (function(){
       };
     });
   }
+  function wireRestore(b){
+    b.onclick=function(){
+      b.disabled=true; b.textContent='處理中…';
+      // 放回去牽動三頁的計數，重載最省事也最不會各說各話
+      patch(b.dataset.id, b.dataset.field, b.dataset.value==='1', b,
+            function(){ location.reload(); });
+    };
+  }
   function dialogs(){
     document.querySelectorAll('[data-open]').forEach(function(b){
       b.onclick=function(){ document.getElementById(b.dataset.open).showModal(); };
@@ -392,15 +400,32 @@ window.NR = (function(){
     document.querySelectorAll('[data-close]').forEach(function(b){
       b.onclick=function(){ b.closest('dialog').close(); };
     });
-    // 彈窗裡的還原動作：寫回後直接重載，三頁的計數才不會各說各話
-    document.querySelectorAll('.dlg-restore').forEach(function(b){
-      b.onclick=function(){
-        b.disabled=true; b.textContent='處理中…';
-        patch(b.dataset.id, b.dataset.field, b.dataset.value==='1', b,
-              function(){ location.reload(); });
-      };
-    });
+    document.querySelectorAll('.dlg-restore').forEach(wireRestore);
   }
-  return {patch:patch, sortable:sortable, expanders:expanders, dialogs:dialogs};
+  // 收起來的東西要「當下」就進彈窗。彈窗內容是伺服器在頁面載入時畫的，
+  // 不同步加進去的話，使用者剛按掉的那一筆要重整才看得到 —— 等於沒作用。
+  function stash(did, info){
+    var dlg=document.getElementById(did); if(!dlg) return;
+    var body=dlg.querySelector('.dlg-b');
+    var blank=body.querySelector('.dlg-empty'); if(blank) blank.remove();
+    var row=document.createElement('div');
+    row.className='dlg-row';
+    row.innerHTML='<div class="g"><div class="t"></div><div class="m"></div></div>';
+    row.querySelector('.t').textContent=info.title;
+    row.querySelector('.m').textContent=info.meta;
+    var btn=document.createElement('button');
+    btn.className='btn btn-s dlg-restore';
+    btn.dataset.id=info.id; btn.dataset.field=info.field; btn.dataset.value='0';
+    btn.textContent=info.label;
+    wireRestore(btn);
+    row.appendChild(btn);
+    body.appendChild(row);
+    var n=body.querySelectorAll('.dlg-row').length;
+    var h=dlg.querySelector('.dlg-n'); if(h) h.textContent=n;
+    var opener=document.querySelector('[data-open="'+did+'"] b');
+    if(opener) opener.textContent=n;
+  }
+  return {patch:patch, sortable:sortable, expanders:expanders,
+          dialogs:dialogs, stash:stash};
 })();
 """

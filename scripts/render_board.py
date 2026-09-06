@@ -61,7 +61,7 @@ def dialog(did: str, title: str, hint: str, rows: list[tuple[str, dict]],
         items = f"<div class='dlg-empty'>目前沒有{title}的職缺。</div>"
     return (
         f"<dialog class='dlg' id='{did}'>"
-        f"<div class='dlg-h'><h3>{title}（{len(rows)}）</h3>"
+        f"<div class='dlg-h'><h3>{title}（<span class='dlg-n'>{len(rows)}</span>）</h3>"
         f"<span class='sp'></span>"
         f"<button class='btn btn-g' data-close>關閉</button></div>"
         f"<div class='dlg-b'><p class='hint'>{hint}</p>{items}</div></dialog>"
@@ -102,7 +102,7 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
             f"<tr class='row' data-id='{jid}' data-saved='{int(saved)}' "
             f"data-score='{sc}' data-src='{E(j.get('source',''))}' "
             f"data-title='{E(j.get('title',''))}' data-company='{E(j.get('company',''))}' "
-            f"data-hay='{E(hay)}'>"
+            f"data-loc='{E(j.get('location',''))}' data-hay='{E(hay)}'>"
             f"<td class='ctr'><span class='toggle'>▶</span></td>"
             f"<td class='num'><span class='badge b-{score_class(sc)}'>{sc}</span></td>"
             f"<td class='ttl' title='{E(j.get('title',''))}'>{job_link(j)}</td>"
@@ -194,7 +194,11 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
       btn.onclick=function(){
         var r=rowOf(btn.dataset.id);
         NR.patch(btn.dataset.id,'seen',true,btn,function(){
-          r.dataset.gone='1'; apply();
+          r.dataset.gone='1';
+          NR.stash('seenDlg',{id:r.dataset.id, field:'seen', label:'放回清單',
+            title:r.dataset.title,
+            meta:r.dataset.company+'　·　'+r.dataset.loc+'　·　評分 '+r.dataset.score});
+          apply();
         });
       };
     });
@@ -272,7 +276,9 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
 
         cards.append(
             f"<article class='an' data-id='{jid}' data-total='{total if total is not None else -1}' "
-            f"data-rated='{0 if total is None else 1}'>"
+            f"data-rated='{0 if total is None else 1}' "
+            f"data-title='{E(j.get('title',''))}' data-company='{E(j.get('company',''))}' "
+            f"data-loc='{E(j.get('location',''))}' data-score='{e.get('score',0)}'>"
             "<div class='an-l'>"
             f"<div class='an-co mono'>{E(j.get('company',''))}　·　{E(j.get('location',''))}</div>"
             f"<h3>{job_link(j)}</h3>"
@@ -338,8 +344,13 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
     });
     document.querySelectorAll('.act-unsave').forEach(function(btn){
       btn.onclick=function(){
+        var c=btn.closest('.an');
         NR.patch(btn.dataset.id,'saved',false,btn,function(){
-          btn.closest('.an').dataset.gone='1'; apply();
+          c.dataset.gone='1';
+          NR.stash('outDlg',{id:c.dataset.id, field:'saved', label:'放回診斷',
+            title:c.dataset.title,
+            meta:c.dataset.company+'　·　'+c.dataset.loc+'　·　評分 '+c.dataset.score});
+          apply();
         });
       };
     });
