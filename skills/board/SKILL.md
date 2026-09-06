@@ -72,6 +72,7 @@ description: NextRole 職缺看板：打開可篩選排序的職缺資料表、�
 
 ## 已知地雷
 
+- `cd ~/.nextrole/bin` 失敗時（通常是 plugin 更新過，symlink 指向舊版本），跑一次 `/nextrole:setup` 就會重新指好。
 - 看板頁面是靜態檔，靠 `serve.py` 的 `PATCH /api/job/<id>` 寫回。**沒起 server 就改東西**只會存在瀏覽器的 localStorage，頁面會跳黃色提示 — 照提示把暫存內容貼回來補寫。
 - `PATCH` 只收 `status` 與 `notes`。適合度與分數不能從頁面改，只能走 Phase 1。
 - 重跑搜尋會更新分數，**但不會動使用者的判斷**。分數變了而狀態沒變是正常的。
