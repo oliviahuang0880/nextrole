@@ -3,12 +3,12 @@
 # dependencies = ["requests", "beautifulsoup4", "lxml"]
 # ///
 """NextRole 搜尋主程式：讀 ~/.nextrole/profile.json → 廣撒搜尋 104/Cake/LinkedIn
-→ 抓完整 JD → 評分 → 寫 ./output/ HTML + CSV。
+→ 抓完整 JD → 評分 → 寫 ~/.nextrole/output/ HTML + CSV → 併進職缺看板。
 
 用法：
     uv run run_search.py                       # 全部用 profile 預設、爬 104/Cake/LinkedIn
     uv run run_search.py --queries UX 產品     # 額外加領域查詢詞
-    uv run run_search.py --from-cache          # 用 ./output/_jobs_cache.json 重算（不重爬）
+    uv run run_search.py --from-cache          # 用快取重算（不重爬）
 """
 from __future__ import annotations
 
@@ -21,13 +21,17 @@ import os
 import time
 from pathlib import Path
 
+import board as _board
+import render_board as _render_board
+import store as _store
+from profile_io import load_profile
 from score import score_job
 from search_104 import search_104, fetch_104_full
 from search_cake import search_cake, fetch_cake_full
 from search_linkedin import search_linkedin, fetch_linkedin_full
-from profile_io import load_profile
 
-OUTPUT = os.path.abspath("./output")
+# 產出改放 ~/.nextrole/output/，跟看板同一個地方，board 才找得到。
+OUTPUT = _store.OUTPUT
 JOBS_CACHE = os.path.join(OUTPUT, "_jobs_cache.json")
 
 
@@ -398,12 +402,12 @@ def main():
     ap.add_argument("--max", type=int, default=25, help="每站每關鍵字抓取上限")
     ap.add_argument("--queries", nargs="*", default=[], help="額外加入的搜尋詞")
     ap.add_argument("--from-cache", action="store_true",
-                    help="用 ./output/_jobs_cache.json 重算（不重爬網路）")
+                    help="用 ~/.nextrole/output/_jobs_cache.json 重算（不重爬網路）")
     ap.add_argument("--top", type=int, default=300, help="抓完整 JD 的候選數上限")
     ap.add_argument("--min-jd", type=int, default=250, help="完整 JD 最少字數")
     ap.add_argument("--diff-against", type=str, default=None,
                     help="一份之前的 results CSV 路徑：本次新出現的 URL 會被標 ✨；"
-                         "傳 'auto' 會自動挑 ./output 裡最新一份舊 CSV（每日跑最方便）")
+                         "傳 'auto' 會自動挑 output 裡最新一份舊 CSV（每日跑最方便）")
     args = ap.parse_args()
 
     cfg = load_profile()
@@ -477,8 +481,14 @@ def main():
     print(f"\n完成！共 {len(scored)} 筆（推薦 {rec} 筆）")
     print(f"  網頁：{html_path}")
     print(f"  CSV ：{csv_path}")
-    print(f"\n看 HTML：cd {OUTPUT} && python3 -m http.server 8765")
-    print(f"  → 開 http://localhost:8765/results_{stamp}.html（不要用 file://，連結會空白）")
+    # 併進職缺看板：只更新分數與 last_seen，使用者的狀態／備註／適合度一律保留
+    stats = _board.merge(scored)
+    _render_board.render(_board.load(), os.path.join(OUTPUT, "board.html"),
+                         _store.load_config()["fit_threshold"])
+    print(f"  看板：新增 {stats['added']} 筆、更新 {stats['updated']} 筆，目前共 {stats['total']} 筆")
+    print("\n開看板：cd ~/.nextrole/bin && uv run serve.py")
+    print(f"  → http://127.0.0.1:8765/board.html　（單次結果：results_{stamp}.html）")
+    print("  ⚠️ 不要用 file:// 開，職缺連結會空白、狀態也存不回去。")
 
     health_check(cfg, queries, raw_counts, n_enriched, scored,
                  html_path, csv_path, from_cache=args.from_cache)

@@ -1,0 +1,13 @@
+{
+  "name": "nextrole",
+  "owner": {
+    "name": "Olivia Huang"
+  },
+  "plugins": [
+    {
+      "name": "nextrole",
+      "source": "./",
+      "description": "求職全流程工具：搜職缺、評分、客製履歷、面試題、模擬面試、進度追蹤。"
+    }
+  ]
+}
