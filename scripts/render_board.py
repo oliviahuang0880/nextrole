@@ -24,29 +24,53 @@ CSS = """
  .bar label{font-size:13px;margin-right:14px;display:inline-block;line-height:2}
  .bar input[type=search]{padding:4px 8px;border:1px solid #ccc;border-radius:6px;font-size:13px;width:220px}
  .bar select{padding:3px 6px;border:1px solid #ccc;border-radius:6px;font-size:13px}
- table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px}
- th,td{border:1px solid #e3e3e3;padding:6px 8px;text-align:left;vertical-align:top}
+ table{border-collapse:collapse;width:100%;font-size:13px;margin-top:8px;table-layout:fixed}
+ th,td{border:1px solid #e3e3e3;padding:3px 6px;text-align:left;vertical-align:middle;
+       overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
  th{background:#f6f8fa;position:sticky;top:0;cursor:pointer;user-select:none;white-space:nowrap}
  th.nosort{cursor:default}
  th .ind{color:#0b66c2;font-size:11px}
  td.score{font-weight:700;text-align:center;background:#f0f7ff}
  td.fit{text-align:center;font-weight:700}
- td.new,td.remote,td.block{text-align:center}
- td.kw{color:#0a7a3f;font-size:12px;max-width:260px}
- tr.job:hover{background:#fafafa}
- tr.detail td{background:#fcfcfd;color:#444;font-size:12px}
+ td.new,td.remote,td.block,td.out{text-align:center}
+ td.out{letter-spacing:1px}
+ td.kw{color:#0a7a3f;font-size:12px}
+ td.ttl a{display:block;overflow:hidden;text-overflow:ellipsis}
+ tr.job:hover{background:#f5f9ff}
+ tr.job.done{color:#9aa0a6}
+ tr.job.done a{color:#7f9dbd}
+ tr.job.hot td.score,tr.job.hot td.fit{background:#eaf5ee}
+ tr.detail td{background:#fcfcfd;color:#444;font-size:12px;white-space:normal;padding:8px 10px}
  tr.detail dl{margin:0;display:grid;grid-template-columns:88px 1fr;gap:2px 10px}
- tr.detail dt{color:#888} tr.detail dd{margin:0}
+ tr.detail dt{color:#888;white-space:nowrap} tr.detail dd{margin:0;word-break:break-word}
+ tr.detail dd.jd{max-height:4.6em;overflow:auto;color:#555}
  a{color:#0b66c2;text-decoration:none} a:hover{text-decoration:underline}
  .pill{display:inline-block;background:#0b66c2;color:#fff;border-radius:12px;padding:2px 10px;font-size:12px}
  .pill.g{background:#0a7a3f} .pill.n{background:#8a8a8a}
  select.st{font-size:12px;padding:2px 4px;border:1px solid #ccc;border-radius:6px}
  select.st[data-v=applied]{background:#eef6ff} select.st[data-v=interviewing]{background:#fff6e0}
  select.st[data-v=offer]{background:#e8f8ee} select.st[data-v=rejected],select.st[data-v=skipped]{color:#999}
- textarea.nt{font:inherit;font-size:12px;width:150px;height:34px;border:1px solid #ddd;border-radius:6px;padding:3px}
+ textarea.nt{font:inherit;font-size:12px;width:100%;height:22px;border:1px solid #e6e6e6;
+   border-radius:5px;padding:2px 5px;resize:none;overflow:hidden;background:#fff;
+   transition:height .12s ease}
+ textarea.nt:focus{height:66px;overflow:auto;outline:2px solid #0b66c2;border-color:#0b66c2}
+ textarea.nt:placeholder-shown{border-color:#f0f0f0}
  .v投{color:#0a7a3f} .v邊緣{color:#b26a00} .v不投{color:#999}
  #banner{display:none;margin:10px 0;padding:8px 12px;border-radius:6px;background:#fff3cd;border:1px solid #ffe08a;font-size:13px}
- .toggle{cursor:pointer;color:#0b66c2}
+ col.c-tog{width:22px} col.c-st{width:80px} col.c-num{width:54px} col.c-blk{width:46px}
+ col.c-co{width:104px} col.c-src{width:68px} col.c-rm{width:38px}
+ col.c-loc{width:98px} col.c-kw{width:118px} col.c-out{width:86px} col.c-nt{width:158px}
+ .toggle{cursor:pointer;color:#0b66c2;user-select:none}
+ .stats{margin:10px 0 0;display:flex;flex-wrap:wrap;gap:6px}
+ .stat{border:1px solid #dfe3e8;background:#fff;border-radius:999px;padding:3px 12px;
+       font-size:12.5px;cursor:pointer;line-height:1.5}
+ .stat:hover{border-color:#0b66c2;color:#0b66c2}
+ .stat.on{background:#0b66c2;border-color:#0b66c2;color:#fff}
+ .stat b{font-weight:700;margin-left:5px}
+ .stat.s-offer{border-color:#0a7a3f;color:#0a7a3f}
+ .stat.s-offer.on{background:#0a7a3f;color:#fff}
+ .stat.s-interviewing{border-color:#b26a00;color:#b26a00}
+ .stat.s-interviewing.on{background:#b26a00;color:#fff}
 """
 
 JS = """
@@ -76,6 +100,21 @@ JS = """
     });
     cnt.textContent='　顯示 '+n+' / '+rows.length+' 筆';
   }
+  var chips=document.querySelectorAll('.stat');
+  chips.forEach(function(c){
+    c.onclick=function(){
+      chips.forEach(function(x){x.classList.remove('on');});
+      c.classList.add('on');
+      fst.value=c.dataset.st; apply();
+    };
+  });
+  function syncChips(){
+    chips.forEach(function(x){
+      x.classList.toggle('on', x.dataset.st===fst.value);
+    });
+  }
+  fst.addEventListener('change', syncChips);
+
   [q,fsrc,fst,fmin,fnew,funrated].forEach(function(el){
     el.addEventListener(el.tagName==='INPUT'&&el.type!=='checkbox'?'input':'change', apply);
   });
@@ -186,23 +225,33 @@ def render(b: dict, path: str, threshold: int) -> str:
         fit_html, verdict, fit_sort = _fit_cell(fit)
         blocked = fit.get("hard_blocker")
         block_cell = "🚫" if blocked else ("—" if blocked is False else "")
-        kw = "、".join((e.get("matched_pos") or [])[:8])
+        all_kw = e.get("matched_pos") or []
+        kw = "、".join(all_kw[:3]) + ("…" if len(all_kw) > 3 else "")
         link = (
             f'<a href="{html.escape(url)}" target="_blank" rel="noopener noreferrer">{html.escape(title)}</a>'
             if url else html.escape(title)
         )
         outs = []
-        for key, label in (("resume", "履歷"), ("cover_letter", "求職信"), ("qa", "面試題"), ("sheet_tab", "頁籤")):
+        for key, icon, label in (("resume", "📄", "履歷"), ("cover_letter", "✉️", "求職信"),
+                                 ("qa", "💬", "面試題"), ("sheet_tab", "📊", "試算表頁籤")):
             if art.get(key):
-                outs.append(f"<span title='{html.escape(str(art[key]))}'>{label}✅</span>")
+                outs.append(
+                    f"<span title='{label}：{html.escape(str(art[key]))}'>{icon}</span>"
+                )
         hay = " ".join([title, company, loc, src, kw]).lower()
+
+        row_cls = ""
+        if status in ("rejected", "skipped"):
+            row_cls = " done"
+        elif fit.get("total") is not None and not blocked and verdict == "投":
+            row_cls = " hot"
 
         sel = "".join(
             f"<option value='{s}'{' selected' if s == status else ''}>{bd.STATUS_ZH[s]}</option>"
             for s in bd.STATUSES
         )
         body.append(
-            f"<tr class='job' data-src='{html.escape(src)}' data-status='{status}' "
+            f"<tr class='job{row_cls}' data-src='{html.escape(src)}' data-status='{status}' "
             f"data-score='{score}' data-fit='{fit_sort}' data-isnew='{1 if status == 'new' else 0}' "
             f"data-rated='{1 if fit.get('total') is not None else 0}' "
             f"data-title='{html.escape(title)}' data-company='{html.escape(company)}' "
@@ -212,11 +261,12 @@ def render(b: dict, path: str, threshold: int) -> str:
             f"<td class='score'>{score}</td>"
             f"<td class='fit'>{fit_html}</td>"
             f"<td class='block'>{block_cell}</td>"
-            f"<td>{link}</td><td>{html.escape(company)}</td><td>{html.escape(src)}</td>"
+            f"<td class='ttl' title='{html.escape(title)}'>{link}</td>"
+            f"<td title='{html.escape(company)}'>{html.escape(company)}</td><td>{html.escape(src)}</td>"
             f"<td class='remote'>{'✅' if j.get('remote') else ''}</td>"
             f"<td>{html.escape(loc)}</td>"
-            f"<td class='kw'>{html.escape(kw)}</td>"
-            f"<td>{' '.join(outs)}</td>"
+            f"<td class='kw' title='{html.escape('、'.join(all_kw))}'>{html.escape(kw)}</td>"
+            f"<td class='out'>{' '.join(outs)}</td>"
             f"<td><textarea class='nt' data-id='{jid}' placeholder='備註'>"
             f"{html.escape(rec.get('notes', ''))}</textarea></td>"
             f"</tr>"
@@ -227,10 +277,11 @@ def render(b: dict, path: str, threshold: int) -> str:
             f"<tr class='detail' style='display:none'><td colspan='13'><dl>"
             f"<dt>子分</dt><dd>技能 {e.get('score_method2', '-')}／天賦 {e.get('score_method1', '-')}"
             f"／扣分 {e.get('penalty', 0)}</dd>"
+            f"<dt>命中關鍵字</dt><dd>{html.escape('、'.join(all_kw) or '無')}</dd>"
             f"<dt>負向命中</dt><dd>{html.escape(neg)}</dd>"
             f"<dt>適合度</dt><dd>{'產業 %s／重疊 %s／條件 %s　%s' % (fit.get('industry', '-'), fit.get('overlap', '-'), fit.get('condition', '-'), html.escape(fit.get('blocker_note') or '')) if fit.get('total') is not None else '尚未評分'}</dd>"
             f"<dt>薪資</dt><dd>{html.escape(j.get('salary') or '未列')}</dd>"
-            f"<dt>JD</dt><dd>{html.escape(jd)}…</dd>"
+            f"<dt>JD</dt><dd class='jd'>{html.escape(jd)}…</dd>"
             f"</dl></td></tr>"
         )
 
@@ -239,18 +290,22 @@ def render(b: dict, path: str, threshold: int) -> str:
         "<th class='nosort'></th><th class='nosort'>狀態</th>"
         "<th data-k='score' data-num='1'>機器分<span class='ind'></span></th>"
         "<th data-k='fit' data-num='1'>適合度<span class='ind'></span></th>"
-        "<th class='nosort'>硬門檻</th>"
+        "<th class='nosort' title='硬門檻：一條不符合就直接被刷掉'>門檻</th>"
         "<th data-k='title'>職缺<span class='ind'></span></th>"
         "<th data-k='company'>公司<span class='ind'></span></th>"
         "<th data-k='src'>來源<span class='ind'></span></th>"
         "<th class='nosort'>遠端</th><th class='nosort'>地點</th>"
-        "<th class='nosort'>命中關鍵字</th><th class='nosort'>產出</th><th class='nosort'>備註</th>"
+        "<th class='nosort'>命中詞</th><th class='nosort'>產出</th><th class='nosort'>備註</th>"
         "</tr>"
     )
 
-    summary = "　".join(
-        f"{bd.STATUS_ZH[s]} {cnt[s]}" for s in bd.STATUSES if cnt[s]
-    ) or "還沒有職缺"
+    chips = ["<button class='stat on' data-st=''>全部<b>%d</b></button>" % cnt["_total"]]
+    for st in bd.STATUSES:
+        if cnt[st]:
+            chips.append(
+                f"<button class='stat s-{st}' data-st='{st}'>{bd.STATUS_ZH[st]}<b>{cnt[st]}</b></button>"
+            )
+    summary = "".join(chips) if cnt["_total"] else "<span class='meta'>還沒有職缺</span>"
 
     doc = (
         '<!doctype html>\n<html lang="zh-TW"><head><meta charset="utf-8">'
@@ -260,7 +315,7 @@ def render(b: dict, path: str, threshold: int) -> str:
         f'<p class="meta">更新於 {now}　|　共 {cnt["_total"]} 筆　|　'
         f'<span class="pill">已評適合度 {cnt["_rated"]} 筆</span>　'
         f'<span class="pill g">投遞門檻 {threshold} 分</span></p>\n'
-        f'<p class="meta">{summary}</p>\n'
+        f'<div class="stats">{summary}</div>\n'
         '<div id="banner">⚠️ 連不上本機服務，改動只暫存在瀏覽器裡。'
         '請用 <code>uv run serve.py</code> 開這一頁，或把下面這段貼給 Claude 補寫回：'
         '<br><code id="pending"></code></div>\n'
@@ -274,7 +329,12 @@ def render(b: dict, path: str, threshold: int) -> str:
         '<label><input type="checkbox" id="fnew"> 只看未處理</label>'
         '<label><input type="checkbox" id="funrated"> 只看未評適合度</label>'
         '<span id="cnt" class="meta"></span></div>\n'
-        f'<table id="board"><thead>{head}</thead><tbody>\n'
+        '<table id="board"><colgroup>'
+        '<col class="c-tog"><col class="c-st"><col class="c-num"><col class="c-num">'
+        '<col class="c-blk"><col><col class="c-co"><col class="c-src"><col class="c-rm">'
+        '<col class="c-loc"><col class="c-kw"><col class="c-out"><col class="c-nt">'
+        '</colgroup>'
+        f'<thead>{head}</thead><tbody>\n'
         + ("\n".join(body) if body else "<tr><td colspan='13'>還沒有職缺。先跑 <code>/nextrole:search</code>。</td></tr>")
         + f"\n</tbody></table>\n<script>{JS}</script>\n</body></html>"
     )
