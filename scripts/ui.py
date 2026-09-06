@@ -29,6 +29,9 @@ CSS = """
  --e2:0 4px 8px -2px rgba(15,23,42,.06),0 2px 4px -2px rgba(15,23,42,.04);
  --e3:0 12px 24px -4px rgba(15,23,42,.10),0 4px 6px -2px rgba(15,23,42,.04);
  --sidebar:260px;
+ --gut:12px;          /* 表格欄距。所有儲存格共用，不要單獨覆寫。
+                         ⚠️ 改這個值，colgroup 的固定欄寬要一起加減 2×gut，
+                         否則窄欄位（箭頭／遠端／取捨）會被 ellipsis 截掉 */
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -145,7 +148,7 @@ table{border-collapse:collapse;width:100%;font-size:13px;table-layout:fixed;
 .tw thead th:last-child{border-top-right-radius:8px}
 .tw tbody tr:last-child td:first-child{border-bottom-left-radius:8px}
 .tw tbody tr:last-child td:last-child{border-bottom-right-radius:8px}
-th,td{padding:8px 10px;text-align:left;vertical-align:middle;
+th,td{padding:8px var(--gut);text-align:left;vertical-align:middle;
   border-bottom:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;
   white-space:nowrap}
 th{background:var(--surface-alt);color:var(--ink-muted);font-size:11px;font-weight:600;
@@ -167,7 +170,7 @@ td.ttl a:hover{color:var(--navy-cobalt)}
 td.co{color:var(--ink-body)}
 td.meta{color:var(--ink-muted);font-size:12px}
 td.ctr{text-align:center}
-tr.det td{background:#fbfcfe;white-space:normal;padding:12px 14px;
+tr.det td{background:#fbfcfe;white-space:normal;padding:12px var(--gut);
   border-bottom:1px solid var(--border)}
 tr.det dl{margin:0;display:grid;grid-template-columns:96px 1fr;gap:4px 12px;font-size:12px}
 tr.det dt{color:var(--ink-muted);white-space:nowrap}
@@ -177,7 +180,7 @@ tr.det dd.jd{max-height:5em;overflow:auto}
 .toggle:hover{color:var(--navy-accent)}
 
 /* 取捨用的兩顆圖示鈕：勾勾＝看過，星星＝儲存 */
-td.acts{text-align:right;white-space:nowrap;padding-right:12px}
+td.acts{text-align:right;white-space:nowrap}
 .ico{font:inherit;font-size:14px;line-height:1;width:26px;height:26px;padding:0;
   border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;
   color:var(--ink-faint);vertical-align:middle}
@@ -287,7 +290,9 @@ dialog.dlg::backdrop{background:rgba(15,23,42,.34)}
 @media (max-width:1180px){ .an{grid-template-columns:1fr}
   .an-r{border-left:0;border-top:1px solid var(--border);padding-left:0;padding-top:16px}
   .funnel{grid-template-columns:repeat(2,1fr)} }
-@media (max-width:1100px){
+/* design.md：平板 768–1279 側欄縮成 64px 圖示列。
+   斷點設太低的話，1100–1280 之間側欄還佔 260px，表格會被擠到截字 */
+@media (max-width:1279px){
   :root{--sidebar:64px}
   .brand b,.nav a span.lb,.nav .n,.side .foot{display:none}
   .nav a{justify-content:center}

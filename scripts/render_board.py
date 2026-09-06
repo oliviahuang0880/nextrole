@@ -95,7 +95,7 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
         sc = e.get("score", 0)
         saved = bool(rec.get("saved"))
         all_kw = e.get("matched_pos") or []
-        kw = "、".join(all_kw[:3]) + ("…" if len(all_kw) > 3 else "")
+        kw = "、".join(all_kw)      # 顯示到欄寬為止，超出的由 text-overflow 收尾
         hay = " ".join([j.get("title", ""), j.get("company", ""),
                         j.get("location", ""), j.get("source", ""), kw]).lower()
         body.append(
@@ -131,9 +131,9 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
 
     table = (
         "<div class='tw'><table id='t'><colgroup>"
-        "<col style='width:30px'><col style='width:72px'><col style='width:246px'>"
-        "<col style='width:126px'><col style='width:72px'><col style='width:48px'>"
-        "<col style='width:112px'><col><col style='width:84px'>"
+        "<col style='width:36px'><col style='width:66px'><col style='width:300px'>"
+        "<col style='width:126px'><col style='width:78px'><col style='width:52px'>"
+        "<col style='width:106px'><col><col style='width:90px'>"
         "</colgroup><thead><tr>"
         "<th class='nosort'></th>"
         "<th data-k='score' data-num='1' class='rt'>評分<span class='ind'></span></th>"
@@ -408,8 +408,8 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
 
     table = (
         "<div class='tw'><table id='t'><colgroup>"
-        "<col style='width:104px'><col><col style='width:140px'><col style='width:84px'>"
-        "<col style='width:142px'><col style='width:250px'>"
+        "<col style='width:108px'><col style='width:268px'><col style='width:150px'>"
+        "<col style='width:84px'><col style='width:148px'><col>"
         "</colgroup><thead><tr>"
         "<th class='nosort'>狀態</th>"
         "<th data-k='title'>職缺<span class='ind'></span></th>"
