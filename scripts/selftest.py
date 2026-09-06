@@ -6,6 +6,8 @@ uv run selftest.py
 from __future__ import annotations
 
 import os
+import re
+import subprocess
 import sys
 import tempfile
 
@@ -50,6 +52,42 @@ JOBS = [
      "url": "https://example.test/b", "location": "台北", "remote": True,
      "salary": "", "description": "社群經營。"},
 ]
+
+
+# 這個 plugin 是公開的，裡面不能有任何一個使用者的求職素材。
+# 只列「一定是某個人的東西」的樣態，不列通用詞。
+PERSONAL_PATTERNS = [
+    r"\b1[A-Za-z0-9_-]{25,}\b",          # Google 試算表／文件 ID
+    r"[\w.+-]+@(?!example\.)[\w-]+\.[\w.]+",  # Email（example.* 是文件用的假網域）
+    r"\+?886[\d-]{8,}|09\d{2}-?\d{3}-?\d{3}",  # 台灣手機
+    r"(?:月薪|年薪|期望待遇)[^\n]{0,12}\d{2,}",   # 具體薪資帶
+]
+# 這些是 repo 自己的身分，不是求職素材
+ALLOWED = [r"github\.com/[\w-]+/nextrole", r"0900-000-000"]
+
+
+def audit_repo(root: str) -> list[str]:
+    hits = []
+    files = subprocess.run(["git", "-C", root, "ls-files"], capture_output=True,
+                           text=True, check=True).stdout.split()
+    for rel in files:
+        if rel == "scripts/selftest.py":   # 樣態本身就寫在這支裡
+            continue
+        path = os.path.join(root, rel)
+        try:
+            text = open(path, encoding="utf-8").read()
+        except (UnicodeDecodeError, IsADirectoryError, FileNotFoundError):
+            continue
+        for pat in PERSONAL_PATTERNS:
+            for m in re.finditer(pat, text):
+                frag = m.group(0)
+                if any(re.search(a, frag) for a in ALLOWED):
+                    continue
+                line = text[:m.start()].count("\n") + 1
+                if any(re.search(a, text.splitlines()[line - 1]) for a in ALLOWED):
+                    continue
+                hits.append(f"{rel}:{line}  {frag}")
+    return hits
 
 
 def _score_all(jobs):
@@ -119,6 +157,13 @@ def main():
 
     print("\n[8] 零個人資料：暫存 HOME 以外什麼都沒寫")
     check(store.ROOT.startswith(_TMP), f"所有寫入都在暫存區（{store.ROOT}）")
+
+    print("\n[9] 零個人資料：repo 本身")
+    repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    hits = audit_repo(repo)
+    check(not hits, "repo 裡查無試算表 ID／Email／電話／薪資帶")
+    for h in hits:
+        print(f"     {h}")
 
     print()
     if FAILED:
