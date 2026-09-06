@@ -1,10 +1,16 @@
 {
   "name": "nextrole",
-  "version": "0.2.0",
-  "description": "求職全流程工具：搜職缺 → 評分 → 決定投不投 → 客製履歷 → 準備面試題 → 模擬面試 → 追蹤進度。所有個人素材留在使用者本機，不進 repo。",
+  "version": "0.3.0",
+  "description": "求職全流程工具（三頁看板）：職缺收件匣做取捨 → 契合度診斷決定投不投 → 投遞追蹤看進度；另有客製履歷、面試題與模擬面試。所有個人素材留在使用者本機，不進 repo。",
   "author": {
     "name": "Olivia Huang"
   },
   "homepage": "https://github.com/oliviahuang0880/nextrole",
-  "keywords": ["job-search", "resume", "interview", "career", "taiwan"]
+  "keywords": [
+    "job-search",
+    "resume",
+    "interview",
+    "career",
+    "taiwan"
+  ]
 }

@@ -7,7 +7,8 @@
     {
       "name": "nextrole",
       "source": "./",
-      "description": "求職全流程工具：搜職缺、評分、客製履歷、面試題、模擬面試、進度追蹤。"
+      "description": "求職全流程：搜職缺、取捨、契合度診斷、客製履歷、面試題、模擬面試、投遞追蹤。"
     }
-  ]
+  ],
+  "description": "Olivia 的求職工具。目前只有 nextrole 一個 plugin。"
 }
