@@ -1,6 +1,6 @@
 ---
-name: nextrole
-description: 求職／找工作／換工作流程，預設台灣、可選海外/全球/遠端。用對話引導使用者完成天賦問卷（可選，邀朋友看自己天賦）與技能問卷（35 題情境式自評），產出個人化關鍵字後，到 104/Cake/LinkedIn 廣撒搜尋並用通用能力評分（不替使用者預設領域偏好），輸出可篩選的 HTML 報表。觸發詞：找工作、求職、換工作、找職缺、職涯盤點、海外求職、全球求職、遠端工作、remote job、job search、台北求職、轉職、面試準備、想換跑道。
+name: search
+description: 求職／找工作／換工作流程，預設台灣、可選海外/全球/遠端。用對話引導使用者完成天賦問卷（可選，邀朋友看自己天賦）與技能問卷（35 題情境式自評），產出個人化關鍵字後，到 104/Cake/LinkedIn 廣撒搜尋並用通用能力評分（不替使用者預設領域偏好），輸出可篩選的 HTML 報表並併進職缺看板。觸發詞：找工作、求職、換工作、找職缺、職涯盤點、海外求職、全球求職、遠端工作、remote job、job search、台北求職、轉職、想換跑道。
 ---
 
 # NextRole — 求職盤點 Skill（台灣／亞太／全球／遠端）
@@ -12,7 +12,8 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 ## Output Contract
 
 - 唯一持久產物是 `~/.nextrole/profile.json`（覆寫前 `profile_io.py` 會自動備份一份 `profile.<UTC ts>.json`）。
-- 搜尋產出是執行目錄下的 `./output/results_<ts>.html` + `.csv`，以及重算用的 `./output/_jobs_cache.json`。
+- 搜尋產出放 `~/.nextrole/output/`：`results_<ts>.html` + `.csv`、重算用的 `_jobs_cache.json`，以及看板 `board.html`。
+- 搜尋收尾會把結果併進 `~/.nextrole/board.json`。**併入只更新分數與 last_seen，使用者在看板上設的狀態／備註／適合度一律保留** — 不得覆寫。
 - `profile.json` 只放長期偏好：關鍵字、權重、`filters`、`negative`、`scoring`。**不得**寫入單次執行才用的東西（`extra_queries` 只當次有效）。
 - 所有資料留在使用者本機，不上傳。不需要也不得要求 `ANTHROPIC_API_KEY`。
 - 對話輸出有兩個固定格式：關鍵字清單用 `templates/keywords-report.md`，搜尋回報用 `templates/search-summary.md`。兩者都不得殘留 `{{...}}` 填位符號。
@@ -32,6 +33,7 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 ## Phase 0 -- 環境偵測
 
 1. READ 讀取 `rules/環境偵測與降級模式判準.md`，跑 `command -v uv` 判斷完整模式或降級模式。
+   同時確認 `~/.nextrole/bin` 與 `~/.nextrole/config.json` 存在；不存在就先跑 `/nextrole:setup`。
 2. THINK 若沒有 `uv` 但有 bash，依規則詢問使用者是否同意安裝；未同意前不得執行安裝指令。
 3. THINK 確認本次走完整模式或降級模式，後續 Phase 3 收尾與 Phase 5 的做法依此分流。
 
@@ -58,7 +60,7 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
     {"term":"分析判斷","en":"analysis","weight":2}]
    ```
 
-5. WRITE 跑 `cd ~/.claude/skills/nextrole/scripts && uv run merge_talents.py /tmp/talents.json`，列出彙整出的天賦給使用者看，接著進 Phase 3。
+5. WRITE 跑 `cd ~/.nextrole/bin && uv run merge_talents.py /tmp/talents.json`，列出彙整出的天賦給使用者看，接著進 Phase 3。
 
 ## Phase 3 -- 技能問卷（35 題，必做，不可跳）
 
@@ -67,7 +69,7 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 3. WRITE 問完 35 題後把結果餵進 profile：
 
    ```bash
-   cd ~/.claude/skills/nextrole/scripts && echo '{"classifications": {...}, "notes": {...}}' | uv run build_profile.py
+   cd ~/.nextrole/bin && echo '{"classifications": {...}, "notes": {...}}' | uv run build_profile.py
    ```
 
    降級模式沒有 `uv`，改依 `rules/環境偵測與降級模式判準.md` 的替代路徑處理。
@@ -88,13 +90,14 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 1. WRITE 執行搜尋（爬蟲約 1–3 分鐘，選亞太約 5–8 分鐘）：
 
    ```bash
-   cd ~/.claude/skills/nextrole/scripts && uv run run_search.py --queries <extra_queries...>
+   cd ~/.nextrole/bin && uv run run_search.py --queries <extra_queries...>
    ```
 
    降級模式改跑 `uv run browser_urls.py` 印三站搜尋網址讓使用者自己貼到瀏覽器。
 2. READ 讀取 `rules/搜尋結果健檢判準.md`，對照 stdout 最後一行的 `健檢代碼：`，判斷這次結果是否健康。
 3. READ 讀取 `templates/search-summary.md` 與 `templates/search-summary.example.md`。
 4. WRITE 依樣板回報筆數、來源分佈、健檢結論與具體建議、開啟方式（**必須提醒不要用 `file://`**）。健檢代碼不是 `OK` 時，不得用「完成」的語氣草草帶過。
+   收尾要告訴使用者結果已併進看板，用 `/nextrole:board` 或 `cd ~/.nextrole/bin && uv run serve.py` 看。
 5. READ 回頭檢查回報內容有無殘留填位符號、有無違反 `rules/中立與加權判準.md`（例如替使用者推測該走哪個領域）；不符合就立即修正。
 
 ## Phase 6 -- 重新找一次（回訪時）
@@ -108,13 +111,14 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 
 ## 檔案位置摘要
 
-- Skill 本體：`~/.claude/skills/nextrole/`（判準在 `rules/`、輸出格式在 `templates/`）
+- Skill 本體：本 plugin 的 `skills/search/`（判準在 `rules/`、輸出格式在 `templates/`）
+- 腳本：`~/.nextrole/bin`（symlink → plugin 的 `scripts/`）
 - 使用者 profile：`~/.nextrole/profile.json`（含自動備份）
-- 搜尋產出：`./output/results_<ts>.html` + `.csv`；快取 `./output/_jobs_cache.json`
-- 參考資料：`references/method2_skills.json`、`examples/invitation_template.md`
+- 搜尋產出：`~/.nextrole/output/`；職缺主檔 `~/.nextrole/board.json`
+- 參考資料：`skills/search/references/method2_skills.json`、`skills/search/examples/invitation_template.md`
 
 ## 已知地雷
 
-- HTML 結果**不能用 `file://` 開**，職缺連結會空白。必須用 `python3 -m http.server`。
+- HTML 結果**不能用 `file://` 開**，職缺連結會空白、看板的狀態也存不回去。用 `cd ~/.nextrole/bin && uv run serve.py`。
 - Cake / LinkedIn 改版時可能爬不到 — 健檢會回 `SOURCE_DEAD:<站名>`，照 `rules/搜尋結果健檢判準.md` 處理。
 - 搜尋每個關鍵字跑三站後 sleep 1.5 秒節流，避免被擋。
