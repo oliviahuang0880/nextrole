@@ -149,6 +149,15 @@ export PROXY_URL_HTTPS=http://host:port
 
 ## 開發
 
+想看版面長怎樣（不用真的跑爬蟲）：
+
+```bash
+uv run scripts/demo_data.py
+```
+
+會產一份 60 筆的虛構資料到 `~/.nextrole-demo/`，**不會碰到你自己的 `~/.nextrole/`**。
+跑完照它印的指令開 server 就能點。截圖也用這份，不會截到真實職缺。
+
 版面規範在 [`design.md`](design.md)。改任何一頁之前先讀那份，
 樣式一律寫在 `scripts/ui.py` 的共用 CSS，不要為單一頁另寫。
 

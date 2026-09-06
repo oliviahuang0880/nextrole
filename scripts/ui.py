@@ -193,7 +193,7 @@ tr.det dd.jd{max-height:5em;overflow:auto}
 .an-jd{margin:10px 0 0;font-size:12px;line-height:19px;color:var(--ink-muted);
   display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
 .an-act{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:14px}
-.blk{margin-top:10px;background:var(--risk-bg);border:1px solid var(--risk-bd);
+.blk{margin:2px 0 10px;background:var(--risk-bg);border:1px solid var(--risk-bd);
   color:#991b1b;border-radius:8px;padding:7px 11px;font-size:12px;line-height:18px}
 .an-r{border-left:1px solid var(--border);padding-left:20px}
 .ring{width:104px;height:104px;border-radius:50%;margin:0 auto 8px;display:grid;
@@ -251,9 +251,11 @@ textarea.nt:placeholder-shown{border-color:#eef2f6}
 
 def page(title: str, active: str, counts: dict, body: str, script: str = "") -> str:
     """把內容包進共用外殼。active 是 PAGES 的 key。"""
+    # 導覽列的 key 是頁名，board.counts() 的 key 是 stage 名，中間差一個 analysis/saved
+    stage_key = {"inbox": "inbox", "analysis": "saved", "tracker": "tracker"}
     nav = []
     for key, label, icon in PAGES:
-        n = counts.get(key, 0)
+        n = counts.get(stage_key[key], 0)
         on = " on" if key == active else ""
         badge = f"<span class='n'>{n}</span>" if n else ""
         nav.append(

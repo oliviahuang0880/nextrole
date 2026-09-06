@@ -89,10 +89,27 @@ def main():
 
     os.makedirs(store.OUTPUT, exist_ok=True)
     handler = partial(Handler, directory=store.OUTPUT)
-    httpd = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
-    url = f"http://127.0.0.1:{args.port}/inbox.html"
+
+    # 連 port 被佔用都要好好講。往後找 10 個，找不到再放棄。
+    httpd = None
+    port = args.port
+    for port in range(args.port, args.port + 10):
+        try:
+            httpd = ThreadingHTTPServer(("127.0.0.1", port), handler)
+            break
+        except OSError as exc:
+            if exc.errno not in (48, 98):        # EADDRINUSE
+                raise
+            print(f"  port {port} 被佔用了，換一個…")
+    if httpd is None:
+        print(f"❌ {args.port}–{args.port + 9} 都被佔用。用 --port 指定一個空的。")
+        raise SystemExit(1)
+    if port != args.port:
+        print(f"  （原本要用 {args.port}）")
+    url = f"http://127.0.0.1:{port}/inbox.html"
     print(f"看板：{url}")
     print("  ① 收件匣 /inbox.html　② 分析 /analysis.html　③ 投遞追蹤 /tracker.html")
+    print(f"  資料來源：{store.ROOT}")
     print("Ctrl-C 結束。")
     if not args.no_open:
         webbrowser.open(url)
