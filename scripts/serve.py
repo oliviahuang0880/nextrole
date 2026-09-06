@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""開職缺看板。只綁 127.0.0.1，只接受白名單欄位的寫回。
+"""開職缺看板（三頁）。只綁 127.0.0.1，只接受白名單欄位的寫回。
 
 用法：uv run serve.py [--port 8765] [--no-open]
 """
@@ -30,9 +30,21 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(raw)
 
+    def end_headers(self):
+        # 三頁是靜態檔，但每次寫回都會重新產生。不擋快取的話，
+        # 使用者在收件匣按了儲存、切到分析頁會看到舊的那一份。
+        if self.path.endswith(".html") or self.path.startswith("/api/"):
+            self.send_header("Cache-Control", "no-store, must-revalidate")
+        super().end_headers()
+
     def do_GET(self):  # noqa: N802
         if self.path == "/favicon.ico":
             self.send_response(204)
+            self.end_headers()
+            return
+        if self.path in ("/", "/index.html", "/board.html"):
+            self.send_response(302)
+            self.send_header("Location", "/inbox.html")
             self.end_headers()
             return
         return super().do_GET()
@@ -49,11 +61,15 @@ class Handler(SimpleHTTPRequestHandler):
             if not isinstance(fields, dict):
                 raise ValueError("body 必須是物件")
             rec = bd.patch(jid, fields)
+            # 改動會影響其他兩頁的計數與內容，直接全部重畫
+            render_board.render_all(bd.load(), store.load_config())
         except KeyError:
             return self._json(404, {"error": f"查無職缺 {jid}"})
         except (ValueError, json.JSONDecodeError) as exc:
             return self._json(400, {"error": str(exc)})
-        return self._json(200, {"ok": True, "status": rec["status"], "notes": rec["notes"]})
+        return self._json(200, {"ok": True, "status": rec.get("status"),
+                                "seen": rec.get("seen"), "saved": rec.get("saved"),
+                                "notes": rec.get("notes", "")})
 
     def log_message(self, fmt, *args):
         # log_error 會傳 HTTPStatus 進來，不能直接當字串用
@@ -69,13 +85,14 @@ def main():
     args = ap.parse_args()
 
     cfg = store.load_config()
-    render_board.render(bd.load(), os.path.join(store.OUTPUT, "board.html"), cfg["fit_threshold"])
+    render_board.render_all(bd.load(), cfg)
 
     os.makedirs(store.OUTPUT, exist_ok=True)
     handler = partial(Handler, directory=store.OUTPUT)
     httpd = ThreadingHTTPServer(("127.0.0.1", args.port), handler)
-    url = f"http://127.0.0.1:{args.port}/board.html"
+    url = f"http://127.0.0.1:{args.port}/inbox.html"
     print(f"看板：{url}")
+    print("  ① 收件匣 /inbox.html　② 分析 /analysis.html　③ 投遞追蹤 /tracker.html")
     print("Ctrl-C 結束。")
     if not args.no_open:
         webbrowser.open(url)

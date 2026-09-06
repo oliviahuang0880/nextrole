@@ -118,15 +118,35 @@ def main():
     st1 = bd.merge(scored)
     check(st1["added"] == 2 and st1["updated"] == 0, f"新增 2 筆（{st1}）")
 
-    print("\n[4] 使用者在頁面上改狀態、備註、適合度")
+    print("\n[4] 三頁的單向流動：收件匣 → 分析 → 投遞追蹤")
     jid = store.job_id(JOBS[0]["url"])
-    bd.patch(jid, {"status": "applied", "notes": "8/30 投遞"})
+    other = store.job_id(JOBS[1]["url"])
+    check(bd.stage_of(bd.load()["jobs"][jid]) == "inbox", "新職缺一開始在收件匣")
+
+    bd.patch(other, {"seen": True})
+    check(bd.stage_of(bd.load()["jobs"][other]) == "inbox", "只按『看過』還是留在收件匣（只是預設不顯示）")
+
+    bd.patch(jid, {"saved": True})
+    rec = bd.load()["jobs"][jid]
+    check(bd.stage_of(rec) == "saved", "按『儲存』後進到分析頁")
+    check(rec["seen"] is True, "儲存會順便標成看過，收件匣不用再出現")
+
     bd.set_fit(jid, {"industry": 2, "overlap": 4, "condition": 4, "hard_blocker": False})
     rec = bd.load()["jobs"][jid]
-    check(rec["applied_at"] is not None, "改成『已投』時自動記下投遞時間")
-    check(rec["fit"]["total"] == 10 and rec["fit"]["verdict"] == "投", f"適合度 10／13 判定為投（{rec['fit']['verdict']}）")
+    check(rec["fit"]["total"] == 10 and rec["fit"]["verdict"] == "投",
+          f"適合度 10／13 判定為投（{rec['fit']['verdict']}）")
+
+    bd.patch(jid, {"status": "applied", "notes": "8/30 投遞"})
+    rec = bd.load()["jobs"][jid]
+    check(bd.stage_of(rec) == "tracker", "按『開始投遞』後進到投遞追蹤")
+    check(rec["applied_at"] is not None, "投遞時自動記下時間")
+    c = bd.counts()
+    check(c["inbox"] == 1 and c["saved"] == 0 and c["tracker"] == 1,
+          f"三頁計數正確（收件匣 {c['inbox']}／分析 {c['saved']}／追蹤 {c['tracker']}）")
 
     print("\n[5] ⭐ 重跑搜尋不得洗掉使用者的判斷")
+    before = bd.load()["jobs"][jid]
+    check(before["saved"] and before["status"] == "applied", "（前置）這筆已投遞")
     for j in JOBS:  # 模擬第二次爬到同樣的職缺，分數變了
         j["description"] += " 另外需要研究能力。"
     scored2 = _score_all(JOBS)
@@ -134,26 +154,51 @@ def main():
     rec = bd.load()["jobs"][jid]
     check(st2["added"] == 0 and st2["updated"] == 2, f"沒有重複新增（{st2}）")
     check(rec["status"] == "applied", "status 保住了")
+    check(rec["seen"] is True and rec["saved"] is True, "seen／saved 保住了")
     check(rec["notes"] == "8/30 投遞", "notes 保住了")
     check(rec["fit"]["total"] == 10, "fit 保住了")
     check(rec["applied_at"] is not None, "applied_at 保住了")
 
     print("\n[6] 白名單：頁面不能改分數或適合度")
-    for bad in ({"eval": {"score": 100}}, {"fit": {"total": 13}}, {"status": "不存在"}):
+    for bad in ({"eval": {"score": 100}}, {"fit": {"total": 13}}, {"status": "不存在"},
+                {"applied_at": "2020-01-01"}):
         try:
             bd.patch(jid, bad)
             check(False, f"應該要被擋下來：{bad}")
         except (ValueError, KeyError):
             check(True, f"擋下 {list(bad)[0]}")
 
-    print("\n[7] 產出看板")
-    path = render_board.render(bd.load(), os.path.join(store.OUTPUT, "board.html"), cfg["fit_threshold"])
-    doc = open(path, encoding="utf-8").read()
-    check("{{" not in doc, "沒有殘留 {{ 填位符號")
-    check('<select class="st"'.replace('"', "'") in doc, "有狀態下拉")
-    check("8/30 投遞" in doc, "備註有畫出來")
-    check("10／13" in doc, "適合度有畫出來")
-    check("&lt;" in doc or "example.test" in doc, "內容有經過跳脫處理")
+    print("\n[7] 產出三頁")
+    paths = render_board.render_all(bd.load(), cfg)
+    check(len(paths) == 3, f"產出三個檔案（{[os.path.basename(p) for p in paths]}）")
+    docs = {os.path.basename(p): open(p, encoding="utf-8").read() for p in paths}
+    for name, doc in docs.items():
+        check("{{" not in doc, f"{name} 沒有殘留 {{{{ 填位符號")
+    check("8/30 投遞" in docs["tracker.html"], "備註畫在投遞追蹤頁")
+    check("10" in docs["tracker.html"], "適合度畫在投遞追蹤頁")
+    check("act-save" in docs["inbox.html"], "收件匣有儲存按鈕")
+    check("act-apply" in docs["analysis.html"] or "還沒有要分析" in docs["analysis.html"],
+          "分析頁有開始投遞按鈕或空狀態")
+    check("&lt;" in docs["inbox.html"] or "example.test" in docs["inbox.html"],
+          "內容有經過跳脫處理")
+
+    print("\n[7b] 每一頁只放屬於自己的職缺")
+    check(jid in docs["tracker.html"], "已投遞的在追蹤頁")
+    check(jid not in docs["analysis.html"], "已投遞的不會留在分析頁")
+
+    print("\n[7c] v1 舊資料要能升級")
+    old = {"version": 1, "updated_at": store.now(), "jobs": {
+        "a": {"job": {"url": "u"}, "eval": {}, "fit": {}, "status": "interested",
+              "notes": "", "artifacts": {}},
+        "b": {"job": {"url": "v"}, "eval": {}, "fit": {}, "status": "offer",
+              "notes": "", "artifacts": {}}}}
+    store.write_json(store.BOARD, old)
+    m = bd.load()
+    check(m["version"] == 2, "版本升到 2")
+    check(m["jobs"]["a"]["saved"] is True and m["jobs"]["a"]["status"] is None,
+          "舊的『想投』變成 saved、還沒投遞")
+    check(m["jobs"]["b"]["status"] == "offer" and bd.stage_of(m["jobs"]["b"]) == "tracker",
+          "舊的『Offer』留在投遞追蹤")
 
     print("\n[8] 零個人資料：暫存 HOME 以外什麼都沒寫")
     check(store.ROOT.startswith(_TMP), f"所有寫入都在暫存區（{store.ROOT}）")

@@ -483,11 +483,10 @@ def main():
     print(f"  CSV ：{csv_path}")
     # 併進職缺看板：只更新分數與 last_seen，使用者的狀態／備註／適合度一律保留
     stats = _board.merge(scored)
-    _render_board.render(_board.load(), os.path.join(OUTPUT, "board.html"),
-                         _store.load_config()["fit_threshold"])
+    _render_board.render_all(_board.load(), _store.load_config())
     print(f"  看板：新增 {stats['added']} 筆、更新 {stats['updated']} 筆，目前共 {stats['total']} 筆")
     print("\n開看板：cd ~/.nextrole/bin && uv run serve.py")
-    print(f"  → http://127.0.0.1:8765/board.html　（單次結果：results_{stamp}.html）")
+    print(f"  → http://127.0.0.1:8765/inbox.html　（單次結果：results_{stamp}.html）")
     print("  ⚠️ 不要用 file:// 開，職缺連結會空白、狀態也存不回去。")
 
     health_check(cfg, queries, raw_counts, n_enriched, scored,

@@ -13,18 +13,38 @@ import threading
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import store  # noqa: E402
 
-STATUSES = ["new", "interested", "applied", "interviewing", "offer", "rejected", "skipped"]
+# 三頁各管一件事，流動方向是單向的：收件匣 → 分析 → 投遞追蹤。
+#   收件匣  stage="inbox"     還沒取捨的（not seen, not saved）
+#   分析    stage="saved"     按了儲存、但還沒投的
+#   追蹤    stage="tracker"   真的投出去了（status 不是 None）
+STAGES = ["inbox", "saved", "tracker"]
+
+# 投遞之後的狀態。沒投遞的職缺 status 是 None，不在這個清單裡。
+STATUSES = ["applied", "screening", "interviewing", "final", "offer", "rejected"]
 STATUS_ZH = {
-    "new": "新",
-    "interested": "想投",
-    "applied": "已投",
-    "interviewing": "面試中",
+    "applied": "已投遞",
+    "screening": "履歷審查",
+    "interviewing": "安排面試",
+    "final": "最終輪",
     "offer": "Offer",
     "rejected": "已拒",
-    "skipped": "略過",
 }
+# 漏斗順序（tracker 頁的階段轉換率就是照這個算）
+FUNNEL = ["applied", "screening", "interviewing", "final", "offer"]
+
 # 使用者可以從頁面上改的欄位，其他一律不接受
-PATCHABLE = {"status", "notes"}
+PATCHABLE = {"status", "notes", "seen", "saved"}
+
+# v1 → v2：舊的單一 status 拆成 seen / saved / status
+_V1_MAP = {
+    "new":          {"seen": False, "saved": False, "status": None},
+    "interested":   {"seen": True,  "saved": True,  "status": None},
+    "skipped":      {"seen": True,  "saved": False, "status": None},
+    "applied":      {"seen": True,  "saved": True,  "status": "applied"},
+    "interviewing": {"seen": True,  "saved": True,  "status": "interviewing"},
+    "offer":        {"seen": True,  "saved": True,  "status": "offer"},
+    "rejected":     {"seen": True,  "saved": True,  "status": "rejected"},
+}
 
 # board.json 的讀→改→寫必須是不可分割的。serve.py 用 ThreadingHTTPServer，
 # 兩個請求同時進來，後寫的會拿著舊快照蓋掉先寫的。
@@ -46,12 +66,37 @@ def _empty_fit():
     }
 
 
+def _migrate(b: dict) -> bool:
+    """把 v1 的單一 status 拆成 seen / saved / status。回傳有沒有真的改到。"""
+    if b.get("version", 1) >= 2:
+        return False
+    for rec in b.get("jobs", {}).values():
+        old = rec.pop("status", "new")
+        rec.update(_V1_MAP.get(old, _V1_MAP["new"]))
+    b["version"] = 2
+    return True
+
+
 def load() -> dict:
     b = store.read_json(store.BOARD)
     if b is None:
-        b = {"version": 1, "updated_at": store.now(), "jobs": {}}
+        b = {"version": 2, "updated_at": store.now(), "jobs": {}}
     b.setdefault("jobs", {})
+    if _migrate(b):
+        store.write_json(store.BOARD, b)
     return b
+
+
+def stage_of(rec: dict) -> str:
+    if rec.get("status"):
+        return "tracker"
+    if rec.get("saved"):
+        return "saved"
+    return "inbox"
+
+
+def in_stage(b: dict, stage: str) -> list[tuple[str, dict]]:
+    return [(jid, r) for jid, r in b["jobs"].items() if stage_of(r) == stage]
 
 
 def save(b: dict):
@@ -81,7 +126,9 @@ def merge(scored: list[dict], board: dict | None = None) -> dict:
                 "job": job,
                 "eval": ev,
                 "fit": _empty_fit(),
-                "status": "new",
+                "seen": False,
+                "saved": False,
+                "status": None,
                 "notes": "",
                 "first_seen": ts,
                 "last_seen": ts,
@@ -107,12 +154,22 @@ def patch(jid: str, fields: dict, board: dict | None = None) -> dict:
         raise ValueError(f"不允許的欄位：{'、'.join(sorted(unknown))}")
 
     if "status" in fields:
-        st = fields["status"]
-        if st not in STATUSES:
+        st = fields["status"] or None
+        if st is not None and st not in STATUSES:
             raise ValueError(f"未知狀態：{st}")
-        if st == "applied" and not rec.get("applied_at"):
-            rec["applied_at"] = store.now()
+        if st is not None:
+            # 投遞就代表這筆一定看過也存過，補齊避免三頁狀態不一致
+            rec["seen"] = True
+            rec["saved"] = True
+            if not rec.get("applied_at"):
+                rec["applied_at"] = store.now()
         rec["status"] = st
+    if "seen" in fields:
+        rec["seen"] = bool(fields["seen"])
+    if "saved" in fields:
+        rec["saved"] = bool(fields["saved"])
+        if rec["saved"]:
+            rec["seen"] = True          # 存起來就算看過了，收件匣不用再出現
     if "notes" in fields:
         rec["notes"] = str(fields["notes"])[:2000]
 
@@ -171,13 +228,41 @@ def set_artifact(jid: str, key: str, value, board: dict | None = None):
 
 
 def counts(board: dict | None = None) -> dict:
+    """三頁各自的計數。前綴 _ 的是跨頁的總計。"""
     b = board if board is not None else load()
     out = {s: 0 for s in STATUSES}
-    rated = 0
+    out.update({st: 0 for st in STAGES})
+    rated = seen = 0
     for rec in b["jobs"].values():
-        out[rec.get("status", "new")] = out.get(rec.get("status", "new"), 0) + 1
+        out[stage_of(rec)] += 1
+        if rec.get("status"):
+            out[rec["status"]] += 1
         if rec.get("fit", {}).get("total") is not None:
             rated += 1
+        if rec.get("seen"):
+            seen += 1
     out["_total"] = len(b["jobs"])
     out["_rated"] = rated
+    out["_seen"] = seen
     return out
+
+
+def funnel(board: dict | None = None) -> list[dict]:
+    """投遞漏斗。每一階段算的是「有走到這裡（含更後面）」的筆數。"""
+    b = board if board is not None else load()
+    applied = [r for r in b["jobs"].values() if r.get("status")]
+    base = len(applied)
+    reached: dict[str, int] = {}
+    for i, st in enumerate(FUNNEL):
+        if st == "applied":
+            # 投出去的都算走到這一步，包含後來被拒的
+            reached[st] = base
+            continue
+        later = set(FUNNEL[i:])
+        reached[st] = sum(1 for r in applied if r["status"] in later)
+    # 被拒的不知道是在哪一關掉的，所以只計入「已投遞」，後面幾關不重複計算
+    return [
+        {"key": st, "label": STATUS_ZH[st], "n": reached[st],
+         "pct": round(100 * reached[st] / base, 1) if base else 0.0}
+        for st in FUNNEL
+    ]
