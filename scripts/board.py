@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import functools
 import os
+import re
 import sys
 import threading
 
@@ -20,20 +21,24 @@ import store  # noqa: E402
 STAGES = ["inbox", "saved", "tracker"]
 
 # 投遞之後的狀態。沒投遞的職缺 status 是 None，不在這個清單裡。
-STATUSES = ["applied", "screening", "interviewing", "final", "offer", "rejected"]
+STATUSES = ["applied", "first", "second", "third", "offer", "thanks", "ghosted"]
 STATUS_ZH = {
     "applied": "已投遞",
-    "screening": "履歷審查",
-    "interviewing": "安排面試",
-    "final": "最終輪",
+    "first": "一面",
+    "second": "二面",
+    "third": "三面",
     "offer": "Offer",
-    "rejected": "已拒",
+    "thanks": "感謝信",
+    "ghosted": "無聲卡",
 }
-# 漏斗順序（tracker 頁的階段轉換率就是照這個算）
-FUNNEL = ["applied", "screening", "interviewing", "final", "offer"]
+# 漏斗順序（tracker 頁的階段轉換率就是照這個算）。
+# 感謝信與無聲卡是終點，不在漏斗上 —— 不知道是在哪一關掉的。
+FUNNEL = ["applied", "first", "second", "third", "offer"]
+ENDED = {"thanks", "ghosted"}
 
 # 使用者可以從頁面上改的欄位，其他一律不接受
-PATCHABLE = {"status", "notes", "seen", "saved"}
+PATCHABLE = {"status", "notes", "seen", "saved", "applied_at"}
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 # v1 → v2：舊的單一 status 拆成 seen / saved / status
 _V1_MAP = {
@@ -44,6 +49,14 @@ _V1_MAP = {
     "interviewing": {"seen": True,  "saved": True,  "status": "interviewing"},
     "offer":        {"seen": True,  "saved": True,  "status": "offer"},
     "rejected":     {"seen": True,  "saved": True,  "status": "rejected"},
+}
+
+# v2 → v3：面試階段改用一面／二面／三面，拒絕拆成感謝信與無聲卡
+_V2_STATUS = {
+    "screening": "applied",       # 「履歷審查」拿掉了，退回已投遞
+    "interviewing": "first",
+    "final": "third",
+    "rejected": "thanks",
 }
 
 # board.json 的讀→改→寫必須是不可分割的。serve.py 用 ThreadingHTTPServer，
@@ -67,20 +80,27 @@ def _empty_fit():
 
 
 def _migrate(b: dict) -> bool:
-    """把 v1 的單一 status 拆成 seen / saved / status。回傳有沒有真的改到。"""
-    if b.get("version", 1) >= 2:
+    """升級舊版 board.json。回傳有沒有真的改到。"""
+    v = b.get("version", 1)
+    if v >= 3:
         return False
-    for rec in b.get("jobs", {}).values():
-        old = rec.pop("status", "new")
-        rec.update(_V1_MAP.get(old, _V1_MAP["new"]))
-    b["version"] = 2
+    if v < 2:
+        for rec in b.get("jobs", {}).values():
+            old = rec.pop("status", "new")
+            rec.update(_V1_MAP.get(old, _V1_MAP["new"]))
+    if v < 3:
+        for rec in b.get("jobs", {}).values():
+            st = rec.get("status")
+            if st in _V2_STATUS:
+                rec["status"] = _V2_STATUS[st]
+    b["version"] = 3
     return True
 
 
 def load() -> dict:
     b = store.read_json(store.BOARD)
     if b is None:
-        b = {"version": 2, "updated_at": store.now(), "jobs": {}}
+        b = {"version": 3, "updated_at": store.now(), "jobs": {}}
     b.setdefault("jobs", {})
     if _migrate(b):
         store.write_json(store.BOARD, b)
@@ -162,7 +182,7 @@ def patch(jid: str, fields: dict, board: dict | None = None) -> dict:
             rec["seen"] = True
             rec["saved"] = True
             if not rec.get("applied_at"):
-                rec["applied_at"] = store.now()
+                rec["applied_at"] = store.now()[:10]     # 只記日期，跟頁面上的日期選擇器一致
         rec["status"] = st
     if "seen" in fields:
         rec["seen"] = bool(fields["seen"])
@@ -170,6 +190,11 @@ def patch(jid: str, fields: dict, board: dict | None = None) -> dict:
         rec["saved"] = bool(fields["saved"])
         if rec["saved"]:
             rec["seen"] = True          # 存起來就算看過了，收件匣不用再出現
+    if "applied_at" in fields:
+        d = (fields["applied_at"] or "").strip()
+        if d and not _DATE_RE.match(d):
+            raise ValueError(f"投遞日要是 YYYY-MM-DD，收到 {d!r}")
+        rec["applied_at"] = d or None
     if "notes" in fields:
         rec["notes"] = str(fields["notes"])[:2000]
 
@@ -255,12 +280,12 @@ def funnel(board: dict | None = None) -> list[dict]:
     reached: dict[str, int] = {}
     for i, st in enumerate(FUNNEL):
         if st == "applied":
-            # 投出去的都算走到這一步，包含後來被拒的
+            # 投出去的都算走到這一步，包含後來收到感謝信或無聲卡的
             reached[st] = base
             continue
         later = set(FUNNEL[i:])
         reached[st] = sum(1 for r in applied if r["status"] in later)
-    # 被拒的不知道是在哪一關掉的，所以只計入「已投遞」，後面幾關不重複計算
+    # 感謝信與無聲卡不知道是在哪一關掉的，只計入「已投遞」，後面幾關不重複計算
     return [
         {"key": st, "label": STATUS_ZH[st], "n": reached[st],
          "pct": round(100 * reached[st] / base, 1) if base else 0.0}

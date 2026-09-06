@@ -1,6 +1,6 @@
 ---
 name: board
-description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、② 適合度分析決定投不投（產業關係／職務重疊／條件符合 13 分制＋硬門檻）、③ 投遞追蹤看進度與漏斗，並依實際投遞結果校準投遞門檻。使用者說「看職缺清單」「我投到哪了」「求職進度」「這個職缺值得投嗎」「幫我評這幾個職缺」「開看板」時使用。
+description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、② 契合度診斷決定投不投（產業關係／職務重疊／條件符合 13 分制＋硬門檻）、③ 投遞追蹤看進度與漏斗，並依實際投遞結果校準投遞門檻。使用者說「看職缺清單」「我投到哪了」「求職進度」「這個職缺值得投嗎」「幫我評這幾個職缺」「開看板」時使用。
 ---
 
 # 職缺看板（三頁）
@@ -12,11 +12,12 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
 | 頁 | 檔案 | 回答的問題 | 誰會出現在這裡 |
 |---|---|---|---|
 | ① 職缺收件匣 | `inbox.html` | 這批搜尋結果哪些值得留下？ | 還沒投遞的全部 |
-| ② 適合度分析 | `analysis.html` | 留下的這幾個，到底投不投？ | `saved=true` 且還沒投 |
+| ② 契合度診斷 | `analysis.html` | 留下的這幾個，到底投不投？ | `saved=true` 且還沒投 |
 | ③ 投遞追蹤 | `tracker.html` | 投出去的現在到哪了？ | `status` 不是 `null` |
 
 資料欄位：`seen`（看過，收件匣預設不再顯示）、`saved`（儲存，進第二頁）、
-`status`（`null` ＝還沒投；投了之後是 `applied`／`screening`／`interviewing`／`final`／`offer`／`rejected`）。
+`status`（`null` ＝還沒投；投了之後是 `applied`／`first`／`second`／`third`／`offer`／`thanks`／`ghosted`，
+分別是已投遞／一面／二面／三面／Offer／感謝信／無聲卡）、`applied_at`（`YYYY-MM-DD`，使用者可以自己改）。
 
 ## Output Contract
 
@@ -69,8 +70,9 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
    - `seen`（收件匣：看過了，下次不顯示）
    - `saved`（收件匣：儲存，進分析頁。設 true 會順便標成 seen）
    - `status`（投遞後的狀態，設了會自動補 seen／saved 與 `applied_at`）
+   - `applied_at`（`YYYY-MM-DD`）
    - `notes`
-   分數與適合度不能從這裡改 — 適合度只能走 Phase 1。
+   分數與契合度不能從這裡改 — 適合度只能走 Phase 1。
 
 ## Phase 3 -- 校準投遞門檻
 

@@ -52,15 +52,11 @@ def metric(k: str, v: str, sub: str = "") -> str:
 # ── ① 職缺收件匣 ────────────────────────────────────────────
 def render_inbox(b: dict, cfg: dict, path: str) -> str:
     cnt = bd.counts(b)
-    rows_data = sorted(
-        b["jobs"].items(),
+    inbox = sorted(
+        ((j, r) for j, r in b["jobs"].items() if not r.get("status")),
         key=lambda kv: kv[1].get("eval", {}).get("score", 0), reverse=True,
     )
-    inbox = [(j, r) for j, r in rows_data if not r.get("status")]
-
-    scores = [r["eval"].get("score", 0) for _, r in inbox] or [0]
-    avg = round(sum(scores) / len(scores))
-    hi_n = sum(1 for s in scores if s >= 75)
+    hidden = sum(1 for _, r in inbox if r.get("seen") and not r.get("saved"))
 
     srcs = sorted({r["job"].get("source", "") for _, r in inbox} - {""})
     src_opts = "".join(f"<option value='{E(s)}'>{E(s)}</option>" for s in srcs)
@@ -75,8 +71,7 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
         hay = " ".join([j.get("title", ""), j.get("company", ""),
                         j.get("location", ""), j.get("source", ""), kw]).lower()
         body.append(
-            f"<tr class='row{' dim' if seen and not saved else ''}' data-id='{jid}' "
-            f"data-seen='{int(seen)}' data-saved='{int(saved)}' "
+            f"<tr class='row' data-id='{jid}' data-seen='{int(seen)}' data-saved='{int(saved)}' "
             f"data-score='{sc}' data-src='{E(j.get('source',''))}' "
             f"data-title='{E(j.get('title',''))}' data-company='{E(j.get('company',''))}' "
             f"data-hay='{E(hay)}'>"
@@ -88,11 +83,14 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
             f"<td class='ctr'>{'✓' if j.get('remote') else ''}</td>"
             f"<td class='meta' title='{E(j.get('location',''))}'>{E(j.get('location',''))}</td>"
             f"<td class='meta' title='{E('、'.join(all_kw))}'>{E(kw)}</td>"
-            f"<td class='ctr'>"
-            f"<button class='btn btn-g act-seen' data-id='{jid}'>"
-            f"{'已看過' if seen else '看過'}</button>"
-            f"<button class='btn {'btn-p' if saved else 'btn-s'} act-save' data-id='{jid}'>"
-            f"{'已儲存' if saved else '☆ 儲存'}</button></td></tr>"
+            f"<td class='acts'>"
+            f"<button class='ico act-seen{' on' if seen else ''}' data-id='{jid}' "
+            f"title='{'已儲存的不用再標看過' if saved else '看過了，從清單收起來'}'"
+            f"{' disabled' if saved else ''}>✓</button>"
+            f"<button class='ico star act-save{' on' if saved else ''}' data-id='{jid}' "
+            f"title='{'已儲存' if saved else '儲存，進到適合度分析'}'"
+            f"{' disabled' if saved else ''}>{'★' if saved else '☆'}</button>"
+            f"</td></tr>"
         )
         jd = (j.get("description") or "").strip().replace("\n", " ")[:400]
         body.append(
@@ -101,23 +99,22 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
             f"　扣分 {e.get('penalty',0)}</dd>"
             f"<dt>命中關鍵字</dt><dd>{''.join(f'<span class=tok>{E(k)}</span>' for k in all_kw) or '無'}</dd>"
             f"<dt>負向命中</dt><dd>{E('、'.join(e.get('matched_neg') or []) or '無')}</dd>"
-            f"<dt>薪資</dt><dd class='mono'>{E(j.get('salary') or '未列')}</dd>"
             f"<dt>JD</dt><dd class='jd'>{E(jd)}…</dd></dl></td></tr>"
         )
 
     table = (
         "<div class='tw'><table id='t'><colgroup>"
-        "<col style='width:30px'><col style='width:64px'><col>"
+        "<col style='width:30px'><col style='width:96px'><col>"
         "<col style='width:130px'><col style='width:76px'><col style='width:48px'>"
-        "<col style='width:118px'><col style='width:170px'><col style='width:158px'>"
+        "<col style='width:118px'><col style='width:170px'><col style='width:84px'>"
         "</colgroup><thead><tr>"
         "<th class='nosort'></th>"
-        "<th data-k='score' data-num='1'>機器分<span class='ind'></span></th>"
+        "<th data-k='score' data-num='1' class='rt'>適合度評分<span class='ind'></span></th>"
         "<th data-k='title'>職缺<span class='ind'></span></th>"
         "<th data-k='company'>公司<span class='ind'></span></th>"
         "<th data-k='src'>來源<span class='ind'></span></th>"
         "<th class='nosort'>遠端</th><th class='nosort'>地點</th>"
-        "<th class='nosort'>命中詞</th><th class='nosort'>取捨</th>"
+        "<th class='nosort'>命中詞</th><th class='nosort'></th>"
         "</tr></thead><tbody>" + "\n".join(body) + "</tbody></table></div>"
     ) if inbox else empty(
         "收件匣是空的",
@@ -127,20 +124,15 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
     content = (
         "<div class='head'><div class='kicker'>第一步 · 取捨</div>"
         "<h1>職缺收件匣</h1>"
-        "<p>這批搜尋結果裡，哪些值得留下？機器分只看關鍵字命中，"
+        "<p>這批搜尋結果裡，哪些值得留下？適合度評分只看關鍵字命中，"
         "用它判斷搜尋詞抓得準不準，不是判斷該不該投。</p></div>"
-        "<div class='metrics'>"
-        + metric("未處理", str(cnt["inbox"]), "還沒看過也沒儲存")
-        + metric("高分職缺", str(hi_n), "機器分 ≥ 75")
-        + metric("平均機器分", str(avg), f"{len(inbox)} 筆的平均")
-        + metric("已儲存", str(cnt["saved"] + cnt["tracker"]), "進到分析或投遞")
-        + "</div>"
         "<div class='bar'>"
         "<label>搜尋 <input type='search' id='q' placeholder='職缺／公司／地點／關鍵字'></label>"
         f"<label>來源 <select id='fsrc'><option value=''>全部</option>{src_opts}</select></label>"
-        "<label>機器分 ≥ <select id='fmin'><option value='0'>不限</option>"
+        "<label>評分 ≥ <select id='fmin'><option value='0'>不限</option>"
         "<option value='50'>50</option><option value='75'>75</option></select></label>"
-        "<label><input type='checkbox' id='fseen'> 顯示已看過</label>"
+        f"<button class='lnk' id='toggleSeen' data-on='0'>已看過 "
+        f"<b id='seenN'>{hidden}</b> 筆 · 顯示</button>"
         "<span class='sp' id='cnt'></span></div>"
         + table
     )
@@ -148,14 +140,18 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
     js = """
     var rows=[].slice.call(document.querySelectorAll('tr.row'));
     var q=document.getElementById('q'),fsrc=document.getElementById('fsrc'),
-        fmin=document.getElementById('fmin'),fseen=document.getElementById('fseen'),
-        cnt=document.getElementById('cnt');
+        fmin=document.getElementById('fmin'),cnt=document.getElementById('cnt'),
+        tSeen=document.getElementById('toggleSeen'),seenN=document.getElementById('seenN');
+    function hiddenCount(){
+      return rows.filter(function(r){
+        return r.dataset.seen==='1'&&r.dataset.saved!=='1';}).length;
+    }
     function apply(){
       var t=(q.value||'').trim().toLowerCase(),s=fsrc.value,
-          m=parseInt(fmin.value||'0',10),n=0;
+          m=parseInt(fmin.value||'0',10),showSeen=tSeen&&tSeen.dataset.on==='1',n=0;
       rows.forEach(function(r){
         var ok=true;
-        if(r.dataset.seen==='1'&&r.dataset.saved!=='1'&&!fseen.checked) ok=false;
+        if(r.dataset.seen==='1'&&r.dataset.saved!=='1'&&!showSeen) ok=false;
         if(ok&&s&&r.dataset.src!==s) ok=false;
         if(ok&&m&&parseInt(r.dataset.score,10)<m) ok=false;
         if(ok&&t&&r.dataset.hay.indexOf(t)===-1) ok=false;
@@ -164,10 +160,21 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
         if(d&&d.classList.contains('det')&&!ok) d.style.display='none';
         if(ok)n++;
       });
-      cnt.textContent='顯示 '+n+' / '+rows.length+' 筆';
+      cnt.textContent='顯示 '+n+' 筆';
+      if(seenN){
+        var h=hiddenCount();
+        seenN.textContent=h;
+        tSeen.style.display=h?'':'none';
+        tSeen.lastChild.textContent = tSeen.dataset.on==='1'?' 筆 · 收起':' 筆 · 顯示';
+      }
     }
-    [q,fsrc,fmin,fseen].forEach(function(el){
+    [q,fsrc,fmin].forEach(function(el){
       el.addEventListener(el.type==='search'?'input':'change',apply);});
+    if(tSeen) tSeen.onclick=function(){
+      tSeen.dataset.on = tSeen.dataset.on==='1'?'0':'1';
+      tSeen.classList.toggle('on', tSeen.dataset.on==='1');
+      apply();
+    };
 
     function rowOf(id){return rows.filter(function(r){return r.dataset.id===id;})[0];}
     document.querySelectorAll('.act-seen').forEach(function(btn){
@@ -175,21 +182,22 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
         var r=rowOf(btn.dataset.id), on=r.dataset.seen!=='1';
         NR.patch(btn.dataset.id,'seen',on,btn,function(){
           r.dataset.seen=on?'1':'0';
-          btn.textContent=on?'已看過':'看過';
-          r.classList.toggle('dim', on && r.dataset.saved!=='1');
+          btn.classList.toggle('on',on);
           apply();
         });
       };
     });
     document.querySelectorAll('.act-save').forEach(function(btn){
       btn.onclick=function(){
-        var r=rowOf(btn.dataset.id), on=r.dataset.saved!=='1';
-        NR.patch(btn.dataset.id,'saved',on,btn,function(){
-          r.dataset.saved=on?'1':'0';
-          if(on) r.dataset.seen='1';
-          btn.textContent=on?'已儲存':'☆ 儲存';
-          btn.className='btn '+(on?'btn-p':'btn-s')+' act-save';
-          r.classList.toggle('dim', r.dataset.seen==='1' && !on);
+        if(btn.disabled) return;
+        var r=rowOf(btn.dataset.id);
+        NR.patch(btn.dataset.id,'saved',true,btn,function(){
+          r.dataset.saved='1'; r.dataset.seen='1';
+          btn.textContent='★'; btn.classList.add('on');
+          btn.disabled=true; btn.title='已儲存（要取消請到適合度分析頁）';
+          var sb=r.querySelector('.act-seen');
+          if(sb){ sb.classList.add('on'); sb.disabled=true;
+                  sb.title='已儲存的不用再標看過'; }
           apply();
         });
       };
@@ -226,7 +234,7 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
             score_block = (
                 "<div class='ring n'><span>—</span><small>未評分</small></div>"
                 "<p class='meta' style='margin:10px 0 0;font-size:12px;color:var(--ink-muted)'>"
-                "還沒評。跟 Claude 說「幫我評這筆」，或用 <code>/nextrole:board</code>。</p>"
+                "還沒診斷。跟 Claude 說「幫我評這筆」，或用 <code>/nextrole:board</code>。</p>"
             )
             bars = ""
         else:
@@ -260,8 +268,7 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
             f"<div class='an-co mono'>{E(j.get('company',''))}　·　{E(j.get('location',''))}</div>"
             f"<h3>{job_link(j)}</h3>"
             f"{blocker}"
-            f"<div class='an-m'>機器分 <b>{e.get('score',0)}</b>　"
-            f"<span class='mono'>{E(j.get('salary') or '薪資未列')}</span></div>"
+            f"<div class='an-m'>適合度評分 <b>{e.get('score',0)}</b></div>"
             f"<div>{''.join(f'<span class=tok>{E(k)}</span>' for k in all_kw[:6])}</div>"
             f"{jd_html}"
             "<div class='an-act'>"
@@ -275,19 +282,19 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
 
     content = (
         "<div class='head'><div class='kicker'>第二步 · 判斷</div>"
-        "<h1>適合度分析</h1>"
-        "<p>只有你儲存的職缺會出現在這裡。適合度評分要讀完整 JD，"
+        "<h1>契合度診斷</h1>"
+        "<p>只有你儲存的職缺會出現在這裡。契合度診斷要讀完整 JD，"
         f"所以是你指定才跑。目前的投遞門檻是 {threshold} 分（滿分 13）。</p></div>"
         "<div class='metrics'>"
         + metric("待分析", str(len(saved)), "已儲存、還沒投遞")
-        + metric("已評分", str(len(rated)), f"還有 {len(saved)-len(rated)} 筆沒評")
+        + metric("已診斷", str(len(rated)), f"還有 {len(saved)-len(rated)} 筆沒做")
         + metric("建議投遞", str(len(go)), f"總分 ≥ {threshold+1}")
         + metric("踩到硬門檻", str(sum(1 for r in rated if r['fit'].get('hard_blocker'))),
                  "再怎麼改履歷也過不了")
         + "</div>"
         "<div class='bar'>"
         "<label>搜尋 <input type='search' id='q' placeholder='職缺／公司'></label>"
-        "<label><input type='checkbox' id='funrated'> 只看還沒評分的</label>"
+        "<label><input type='checkbox' id='funrated'> 只看還沒診斷的</label>"
         "<span class='sp' id='cnt'></span></div>"
         + ("<div class='ancol'>" + "\n".join(cards) + "</div>" if saved else empty(
             "還沒有要分析的職缺",
@@ -329,7 +336,7 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
     });
     apply();
     """
-    doc = ui.page("適合度分析 · NextRole", "analysis", cnt, content, js)
+    doc = ui.page("契合度診斷 · NextRole", "analysis", cnt, content, js)
     return _write(path, doc)
 
 
@@ -341,8 +348,8 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
     fn = bd.funnel(b)
 
     offers = cnt["offer"]
-    active = cnt["applied"] + cnt["screening"] + cnt["interviewing"] + cnt["final"]
-    itv = sum(1 for _, r in tracked if r["status"] in ("interviewing", "final", "offer"))
+    active = cnt["applied"] + cnt["first"] + cnt["second"] + cnt["third"]
+    itv = sum(1 for _, r in tracked if r["status"] in ("first", "second", "third", "offer"))
     rate = f"{100*itv/len(tracked):.0f}%" if tracked else "—"
 
     steps = "".join(
@@ -361,17 +368,10 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
             f"<option value='{k}'{' selected' if k == st else ''}>{bd.STATUS_ZH[k]}</option>"
             for k in bd.STATUSES
         )
-        art = rec.get("artifacts") or {}
-        outs = "".join(
-            f"<span title='{lb}'>{ic}</span>"
-            for k, ic, lb in (("resume", "📄", "履歷"), ("cover_letter", "✉️", "求職信"),
-                              ("qa", "💬", "面試題"), ("sheet_tab", "📊", "試算表頁籤"))
-            if art.get(k)
-        )
         vc = verdict_class(rec, cfg["fit_threshold"])
         applied = (rec.get("applied_at") or "")[:10]
         body.append(
-            f"<tr class='row{' dim' if st == 'rejected' else ''}' data-id='{jid}' "
+            f"<tr class='row{' dim' if st in bd.ENDED else ''}' data-id='{jid}' "
             f"data-status='{st}' data-applied='{applied}' "
             f"data-title='{E(j.get('title',''))}' data-company='{E(j.get('company',''))}' "
             f"data-hay='{E((j.get('title','')+' '+j.get('company','')).lower())}'>"
@@ -381,23 +381,22 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
             f"<td class='num'>" + (f"<span class='badge b-{vc}'>{fit['total']}</span>"
                                    if fit.get("total") is not None else
                                    "<span class='meta'>—</span>") + "</td>"
-            f"<td class='meta mono'>{E(applied)}</td>"
-            f"<td class='ctr'>{outs}</td>"
+            f"<td><input type='date' class='dt' data-id='{jid}' value='{E(applied)}'></td>"
             f"<td><textarea class='nt' data-id='{jid}' placeholder='備註'>"
             f"{E(rec.get('notes',''))}</textarea></td></tr>"
         )
 
     table = (
         "<div class='tw'><table id='t'><colgroup>"
-        "<col style='width:118px'><col><col style='width:140px'><col style='width:74px'>"
-        "<col style='width:100px'><col style='width:92px'><col style='width:220px'>"
+        "<col style='width:104px'><col><col style='width:140px'><col style='width:84px'>"
+        "<col style='width:142px'><col style='width:250px'>"
         "</colgroup><thead><tr>"
         "<th class='nosort'>狀態</th>"
         "<th data-k='title'>職缺<span class='ind'></span></th>"
         "<th data-k='company'>公司<span class='ind'></span></th>"
-        "<th class='nosort'>適合度</th>"
-        "<th data-k='applied'>投遞日<span class='ind'></span></th>"
-        "<th class='nosort'>產出</th><th class='nosort'>備註</th>"
+        "<th class='nosort rt'>契合度</th>"
+        "<th data-k='applied' class='rt'>投遞日<span class='ind'></span></th>"
+        "<th class='nosort'>備註</th>"
         "</tr></thead><tbody>" + "\n".join(body) + "</tbody></table></div>"
     ) if tracked else empty(
         "還沒有投遞紀錄",
@@ -414,7 +413,7 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
         + metric("Offer", str(offers), "恭喜" if offers else "還在路上")
         + "</div>"
         + (f"<div class='card pad' style='margin-bottom:18px'>"
-           f"<h2>應徵管道漏斗<span class='sp'>被拒的不知道是在哪一關掉的，只計入「已投遞」</span></h2>"
+           f"<h2>應徵管道漏斗<span class='sp'>感謝信與無聲卡不知道是在哪一關掉的，只計入「已投遞」</span></h2>"
            f"<div class='funnel'>{steps}</div></div>" if tracked else "")
         + "<div class='bar'>"
         "<label>搜尋 <input type='search' id='q' placeholder='職缺／公司'></label>"
@@ -445,13 +444,21 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
         var r=s.closest('tr');
         NR.patch(s.dataset.id,'status',s.value,s,function(){
           r.dataset.status=s.value;
-          r.classList.toggle('dim', s.value==='rejected');
+          r.classList.toggle('dim', s.value==='thanks'||s.value==='ghosted');
           apply();
         });
       };
     });
     document.querySelectorAll('textarea.nt').forEach(function(t){
       t.onchange=function(){ NR.patch(t.dataset.id,'notes',t.value,t); };
+    });
+    document.querySelectorAll('input.dt').forEach(function(d){
+      d.onchange=function(){
+        var r=d.closest('tr');
+        NR.patch(d.dataset.id,'applied_at',d.value,d,function(){
+          r.dataset.applied=d.value;
+        });
+      };
     });
     NR.sortable('t',rows); apply();
     """

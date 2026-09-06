@@ -95,12 +95,13 @@ PROFILE = {
 
 # 備註要跟狀態對得上，否則示範資料自己在打架
 NOTES_BY_STATUS = {
-    "applied":      ["8/28 投遞，用 PM 版履歷", "投遞訊息有附作品集連結", "", "9/1 投遞"],
-    "screening":    ["HR 說這週會看完履歷", "對方主動來信要作品集", ""],
-    "interviewing": ["一面過了，等二面時間", "二面 9/9 14:00，用人主管", "初面約在下週三"],
-    "final":        ["最終輪要見創辦人，準備產品觀察題", "等最後結果，HR 說月底前"],
-    "offer":        ["9/2 拿到 offer，考慮中"],
-    "rejected":     ["履歷階段收感謝信", "投了兩週沒回音", "面試後收到婉拒信", ""],
+    "applied": ["8/28 投遞，用 PM 版履歷", "投遞訊息有附作品集連結", "", "9/1 投遞"],
+    "first":   ["一面約在下週三，HR 面", "一面 9/9 14:00，用人主管", ""],
+    "second":  ["二面過了，等三面時間", "二面問了很多數據的題目"],
+    "third":   ["三面要見創辦人，準備產品觀察題", "等最後結果，HR 說月底前"],
+    "offer":   ["9/2 拿到 offer，考慮中"],
+    "thanks":  ["履歷階段收感謝信", "面試後收到婉拒信", ""],
+    "ghosted": ["投了兩週沒回音", "面試完就沒消息了", ""],
 }
 NOTES_SAVED = ["產品有興趣，等寫完履歷再投", "薪資帶要問清楚", "", "通勤有點遠但職務很合", ""]
 
@@ -171,27 +172,30 @@ def main():
 
     # ── ③ 投遞追蹤：從高分往下挑 14 筆，鋪滿漏斗各階段
     track_plan = [
-        ("offer",        (2, 4, 4), False, ""),
-        ("final",        (3, 4, 4), False, ""),
-        ("interviewing", (2, 4, 3), False, ""),
-        ("interviewing", (1, 4, 4), False, ""),
-        ("screening",    (2, 4, 4), False, ""),
-        ("screening",    (2, 3, 4), False, ""),
-        ("applied",      (1, 4, 3), False, ""),
-        ("applied",      (2, 3, 3), False, ""),
-        ("applied",      (2, 4, 3), False, ""),
-        ("applied",      (1, 3, 4), False, ""),
-        ("rejected",     (3, 4, 2), True,  "必備 5 年以上 PM 年資"),
-        ("rejected",     (2, 3, 2), True,  "必備 B2B SaaS 實戰"),
-        ("rejected",     (1, 3, 3), False, ""),
-        ("rejected",     (1, 2, 3), False, ""),
+        ("offer",   (2, 4, 4), False, ""),
+        ("third",   (3, 4, 4), False, ""),
+        ("second",  (2, 4, 3), False, ""),
+        ("second",  (1, 4, 4), False, ""),
+        ("first",   (2, 4, 4), False, ""),
+        ("first",   (2, 3, 4), False, ""),
+        ("first",   (1, 4, 3), False, ""),
+        ("applied", (2, 3, 3), False, ""),
+        ("applied", (2, 4, 3), False, ""),
+        ("applied", (1, 3, 4), False, ""),
+        ("thanks",  (3, 4, 2), True,  "必備 5 年以上 PM 年資"),
+        ("thanks",  (2, 3, 2), True,  "必備 B2B SaaS 實戰"),
+        ("ghosted", (1, 3, 3), False, ""),
+        ("ghosted", (1, 2, 3), False, ""),
     ]
+    import datetime as _dt
+    today = _dt.date.today()
     cursor = 0
-    for status, fit, blocked, note in track_plan:
+    for offset, (status, fit, blocked, note) in enumerate(track_plan):
         jid = ids[cursor]; cursor += 1
         bd.set_fit(jid, {"industry": fit[0], "overlap": fit[1], "condition": fit[2],
                          "hard_blocker": blocked, "blocker_note": note})
         bd.patch(jid, {"status": status})
+        bd.patch(jid, {"applied_at": str(today - _dt.timedelta(days=3 + offset * 2))})
         n = rnd.choice(NOTES_BY_STATUS[status])
         if n:
             bd.patch(jid, {"notes": n})
@@ -243,7 +247,8 @@ def main():
     print(f"  ① 收件匣 {c['inbox']:>3} 筆（其中 {seen_only} 筆標為看過，預設收起來）")
     print(f"  ② 分析　 {c['saved']:>3} 筆（已評 {rated}、未評 {c['saved'] - rated}）")
     print(f"  ③ 追蹤　 {c['tracker']:>3} 筆（Offer {c['offer']}、進行中 "
-          f"{c['applied'] + c['screening'] + c['interviewing'] + c['final']}、已拒 {c['rejected']}）")
+          f"{c['applied'] + c['first'] + c['second'] + c['third']}、"
+          f"感謝信 {c['thanks']}、無聲卡 {c['ghosted']}）")
     print()
     print("看版面：")
     print(f"  HOME={home} uv run serve.py")

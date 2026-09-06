@@ -158,7 +158,9 @@ tbody tr:last-child td{border-bottom:none}
 tr.row:hover{background:#f6fafe}
 tr.row.dim{color:var(--ink-faint)}
 tr.row.dim a{color:#8fa8c4}
-td.num{font-variant-numeric:tabular-nums;text-align:center;font-weight:600}
+/* 數字欄一律靠右，位數才對得齊 */
+td.num,th.rt{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+td.num .badge{min-width:38px;justify-content:center}
 td.ttl a{display:block;overflow:hidden;text-overflow:ellipsis;color:var(--ink);
   font-weight:600;font-size:13px}
 td.ttl a:hover{color:var(--navy-cobalt)}
@@ -173,6 +175,25 @@ tr.det dd{margin:0;word-break:break-word;color:var(--ink-body)}
 tr.det dd.jd{max-height:5em;overflow:auto}
 .toggle{cursor:pointer;color:var(--ink-faint);user-select:none;font-size:11px}
 .toggle:hover{color:var(--navy-accent)}
+
+/* 取捨用的兩顆圖示鈕：勾勾＝看過，星星＝儲存 */
+td.acts{text-align:right;white-space:nowrap;padding-right:12px}
+.ico{font:inherit;font-size:14px;line-height:1;width:26px;height:26px;padding:0;
+  border:1px solid var(--border);border-radius:8px;background:#fff;cursor:pointer;
+  color:var(--ink-faint);vertical-align:middle}
+.ico + .ico{margin-left:6px}
+.ico:hover:not(:disabled){border-color:var(--border-strong);color:var(--navy-slate)}
+.ico.on{color:var(--hi);border-color:var(--hi-bd);background:var(--hi-bg)}
+.ico.star{font-size:15px}
+.ico.star.on{color:#b7791f;border-color:var(--mid-bd);background:var(--mid-bg)}
+.ico:disabled{cursor:default;opacity:1}
+
+/* 篩選列裡的文字型開關（已看過 N 筆） */
+.lnk{font:inherit;font-size:12px;color:var(--ink-muted);background:transparent;
+  border:1px solid transparent;border-radius:999px;padding:3px 10px;cursor:pointer}
+.lnk:hover{background:var(--surface-alt);color:var(--navy-cobalt)}
+.lnk.on{background:var(--surface-alt);color:var(--navy-cobalt);border-color:var(--border)}
+.lnk b{font-variant-numeric:tabular-nums}
 
 /* ── 契合度條 ───────────────────────── */
 .track{height:6px;background:var(--border);border-radius:999px;overflow:hidden}
@@ -227,6 +248,10 @@ textarea.nt{font:inherit;font-size:12px;line-height:18px;width:100%;height:26px;
   overflow:hidden;background:#fff;transition:height .12s ease}
 textarea.nt:focus{height:72px;overflow:auto;border-color:var(--navy-accent)}
 textarea.nt:placeholder-shown{border-color:#eef2f6}
+input.dt{font:inherit;font-size:12px;font-variant-numeric:tabular-nums;width:100%;
+  padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;
+  color:var(--ink-body);text-align:right}
+input.dt:hover{border-color:var(--border-strong)}
 
 /* ── 空狀態 ─────────────────────────── */
 .empty{background:var(--surface);border:1px dashed var(--border-strong);border-radius:8px;

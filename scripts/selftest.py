@@ -70,8 +70,10 @@ def audit_repo(root: str) -> list[str]:
     hits = []
     files = subprocess.run(["git", "-C", root, "ls-files"], capture_output=True,
                            text=True, check=True).stdout.split()
+    # selftest 本身寫著那些樣態；demo_data 的內容全部是虛構樣板（薪資帶也是假的）
+    skip = {"scripts/selftest.py", "scripts/demo_data.py"}
     for rel in files:
-        if rel == "scripts/selftest.py":   # 樣態本身就寫在這支裡
+        if rel in skip:
             continue
         path = os.path.join(root, rel)
         try:
@@ -161,7 +163,7 @@ def main():
 
     print("\n[6] 白名單：頁面不能改分數或適合度")
     for bad in ({"eval": {"score": 100}}, {"fit": {"total": 13}}, {"status": "不存在"},
-                {"applied_at": "2020-01-01"}):
+                {"first_seen": "2020-01-01"}):
         try:
             bd.patch(jid, bad)
             check(False, f"應該要被擋下來：{bad}")
@@ -177,6 +179,13 @@ def main():
     check("8/30 投遞" in docs["tracker.html"], "備註畫在投遞追蹤頁")
     check("10" in docs["tracker.html"], "適合度畫在投遞追蹤頁")
     check("act-save" in docs["inbox.html"], "收件匣有儲存按鈕")
+    check("適合度評分" in docs["inbox.html"], "收件匣的分叫適合度評分")
+    check("契合度診斷" in docs["analysis.html"], "第二頁叫契合度診斷")
+    check("薪資" not in docs["inbox.html"] and "薪資" not in docs["analysis.html"],
+          "薪資已經不顯示")
+    check("產出" not in docs["tracker.html"], "投遞追蹤沒有產出欄")
+    check("type='date'" in docs["tracker.html"] or 'type="date"' in docs["tracker.html"],
+          "投遞日是日期選擇器")
     check("act-apply" in docs["analysis.html"] or "還沒有要分析" in docs["analysis.html"],
           "分析頁有開始投遞按鈕或空狀態")
     check("&lt;" in docs["inbox.html"] or "example.test" in docs["inbox.html"],
@@ -186,19 +195,34 @@ def main():
     check(jid in docs["tracker.html"], "已投遞的在追蹤頁")
     check(jid not in docs["analysis.html"], "已投遞的不會留在分析頁")
 
+    print("\n[7b2] 投遞日可以自己改，但只收 YYYY-MM-DD")
+    bd.patch(jid, {"applied_at": "2026-08-15"})
+    check(bd.load()["jobs"][jid]["applied_at"] == "2026-08-15", "改得動投遞日")
+    try:
+        bd.patch(jid, {"applied_at": "8/15"})
+        check(False, "格式錯的投遞日應該被擋")
+    except ValueError:
+        check(True, "擋下格式錯的投遞日")
+
     print("\n[7c] v1 舊資料要能升級")
     old = {"version": 1, "updated_at": store.now(), "jobs": {
         "a": {"job": {"url": "u"}, "eval": {}, "fit": {}, "status": "interested",
               "notes": "", "artifacts": {}},
         "b": {"job": {"url": "v"}, "eval": {}, "fit": {}, "status": "offer",
+              "notes": "", "artifacts": {}},
+        "c": {"job": {"url": "w"}, "eval": {}, "fit": {}, "status": "interviewing",
+              "notes": "", "artifacts": {}},
+        "d": {"job": {"url": "x"}, "eval": {}, "fit": {}, "status": "rejected",
               "notes": "", "artifacts": {}}}}
     store.write_json(store.BOARD, old)
     m = bd.load()
-    check(m["version"] == 2, "版本升到 2")
+    check(m["version"] == 3, "版本升到 3")
     check(m["jobs"]["a"]["saved"] is True and m["jobs"]["a"]["status"] is None,
           "舊的『想投』變成 saved、還沒投遞")
     check(m["jobs"]["b"]["status"] == "offer" and bd.stage_of(m["jobs"]["b"]) == "tracker",
           "舊的『Offer』留在投遞追蹤")
+    check(m["jobs"]["c"]["status"] == "first", "舊的『安排面試』轉成一面")
+    check(m["jobs"]["d"]["status"] == "thanks", "舊的『已拒』轉成感謝信")
 
     print("\n[8] 零個人資料：暫存 HOME 以外什麼都沒寫")
     check(store.ROOT.startswith(_TMP), f"所有寫入都在暫存區（{store.ROOT}）")
