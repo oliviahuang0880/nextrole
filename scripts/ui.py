@@ -11,7 +11,7 @@ MONO = '"JetBrains Mono","SF Mono",Menlo,Consolas,monospace'
 
 PAGES = [
     ("inbox", "職缺收件匣", "▤"),
-    ("analysis", "適合度分析", "◈"),
+    ("analysis", "契合度診斷", "◈"),
     ("tracker", "投遞追蹤", "▥"),
 ]
 
@@ -250,8 +250,29 @@ textarea.nt:focus{height:72px;overflow:auto;border-color:var(--navy-accent)}
 textarea.nt:placeholder-shown{border-color:#eef2f6}
 input.dt{font:inherit;font-size:12px;font-variant-numeric:tabular-nums;width:100%;
   padding:4px 8px;border:1px solid var(--border);border-radius:8px;background:#fff;
-  color:var(--ink-body);text-align:right}
+  color:var(--ink-body);text-align:left}
 input.dt:hover{border-color:var(--border-strong)}
+
+/* ── 彈窗 ───────────────────────────── */
+dialog.dlg{border:1px solid var(--border-strong);border-radius:8px;padding:0;
+  box-shadow:var(--e3);max-width:640px;width:calc(100vw - 48px);max-height:78vh;
+  background:var(--surface);color:var(--ink-body)}
+dialog.dlg::backdrop{background:rgba(15,23,42,.34)}
+.dlg-h{display:flex;align-items:center;gap:10px;padding:16px 20px;
+  border-bottom:1px solid var(--border)}
+.dlg-h h3{margin:0;font-size:16px;line-height:24px;font-weight:600;color:var(--ink)}
+.dlg-h .sp{margin-left:auto}
+.dlg-b{padding:6px 20px 16px;overflow:auto;max-height:56vh}
+.dlg-b p.hint{color:var(--ink-muted);font-size:12px;margin:10px 0 4px}
+.dlg-row{display:flex;align-items:center;gap:12px;padding:10px 0;
+  border-bottom:1px solid var(--border)}
+.dlg-row:last-child{border-bottom:none}
+.dlg-row .g{min-width:0;flex:1}
+.dlg-row .t{font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.dlg-row .m{font-size:12px;color:var(--ink-muted);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.dlg-empty{padding:28px 0;text-align:center;color:var(--ink-muted);font-size:13px}
 
 /* ── 空狀態 ─────────────────────────── */
 .empty{background:var(--surface);border:1px dashed var(--border-strong);border-radius:8px;
@@ -364,6 +385,22 @@ window.NR = (function(){
       };
     });
   }
-  return {patch:patch, sortable:sortable, expanders:expanders};
+  function dialogs(){
+    document.querySelectorAll('[data-open]').forEach(function(b){
+      b.onclick=function(){ document.getElementById(b.dataset.open).showModal(); };
+    });
+    document.querySelectorAll('[data-close]').forEach(function(b){
+      b.onclick=function(){ b.closest('dialog').close(); };
+    });
+    // 彈窗裡的還原動作：寫回後直接重載，三頁的計數才不會各說各話
+    document.querySelectorAll('.dlg-restore').forEach(function(b){
+      b.onclick=function(){
+        b.disabled=true; b.textContent='處理中…';
+        patch(b.dataset.id, b.dataset.field, b.dataset.value==='1', b,
+              function(){ location.reload(); });
+      };
+    });
+  }
+  return {patch:patch, sortable:sortable, expanders:expanders, dialogs:dialogs};
 })();
 """

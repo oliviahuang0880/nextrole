@@ -13,6 +13,9 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
 |---|---|---|---|
 | ① 職缺收件匣 | `inbox.html` | 這批搜尋結果哪些值得留下？ | 還沒投遞的全部 |
 | ② 契合度診斷 | `analysis.html` | 留下的這幾個，到底投不投？ | `saved=true` 且還沒投 |
+
+收起來的東西沒有不見：收件匣的「已看過」彈窗列 `seen` 的，診斷頁的「已移出」彈窗列
+`ever_saved` 但已經 `saved=false` 的，都能放回去。
 | ③ 投遞追蹤 | `tracker.html` | 投出去的現在到哪了？ | `status` 不是 `null` |
 
 資料欄位：`seen`（看過，收件匣預設不再顯示）、`saved`（儲存，進第二頁）、
@@ -67,8 +70,8 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
 
 1. READ 找出對應的 `job_id`（用公司名或職缺名比對）。
 2. WRITE `board.patch(job_id, {...})`，只能改這四個欄位：
-   - `seen`（收件匣：看過了，下次不顯示）
-   - `saved`（收件匣：儲存，進分析頁。設 true 會順便標成 seen）
+   - `seen`（收件匣的 ✓：看過了，該列消失，下次搜尋也不再出現）
+   - `saved`（收件匣的 ☆：儲存，進診斷頁。**不會**順便標成 seen，兩者獨立）
    - `status`（投遞後的狀態，設了會自動補 seen／saved 與 `applied_at`）
    - `applied_at`（`YYYY-MM-DD`）
    - `notes`

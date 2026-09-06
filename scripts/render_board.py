@@ -44,6 +44,30 @@ def empty(title: str, hint: str) -> str:
     return f"<div class='empty'><b>{title}</b>{hint}</div>"
 
 
+def dialog(did: str, title: str, hint: str, rows: list[tuple[str, dict]],
+           field: str, btn: str) -> str:
+    """列出被收起來的職缺，每筆可以放回去。"""
+    if rows:
+        items = "".join(
+            f"<div class='dlg-row'><div class='g'>"
+            f"<div class='t'>{E(r['job'].get('title',''))}</div>"
+            f"<div class='m'>{E(r['job'].get('company',''))}　·　"
+            f"{E(r['job'].get('location',''))}　·　評分 {r['eval'].get('score',0)}</div></div>"
+            f"<button class='btn btn-s dlg-restore' data-id='{jid}' "
+            f"data-field='{field}' data-value='0'>{btn}</button></div>"
+            for jid, r in rows
+        )
+    else:
+        items = f"<div class='dlg-empty'>目前沒有{title}的職缺。</div>"
+    return (
+        f"<dialog class='dlg' id='{did}'>"
+        f"<div class='dlg-h'><h3>{title}（{len(rows)}）</h3>"
+        f"<span class='sp'></span>"
+        f"<button class='btn btn-g' data-close>關閉</button></div>"
+        f"<div class='dlg-b'><p class='hint'>{hint}</p>{items}</div></dialog>"
+    )
+
+
 def metric(k: str, v: str, sub: str = "") -> str:
     return (f"<div class='metric'><div class='k'>{k}</div><div class='v'>{v}</div>"
             f"<div class='s'>{sub}</div></div>")
@@ -52,11 +76,15 @@ def metric(k: str, v: str, sub: str = "") -> str:
 # ── ① 職缺收件匣 ────────────────────────────────────────────
 def render_inbox(b: dict, cfg: dict, path: str) -> str:
     cnt = bd.counts(b)
+    # 按了勾勾的不進表格，只進彈窗
+    dismissed = sorted(bd.dismissed(b),
+                       key=lambda kv: kv[1]["eval"].get("score", 0), reverse=True)
+    dismissed_ids = {jid for jid, _ in dismissed}
     inbox = sorted(
-        ((j, r) for j, r in b["jobs"].items() if not r.get("status")),
+        ((j, r) for j, r in b["jobs"].items()
+         if not r.get("status") and j not in dismissed_ids),
         key=lambda kv: kv[1].get("eval", {}).get("score", 0), reverse=True,
     )
-    hidden = sum(1 for _, r in inbox if r.get("seen") and not r.get("saved"))
 
     srcs = sorted({r["job"].get("source", "") for _, r in inbox} - {""})
     src_opts = "".join(f"<option value='{E(s)}'>{E(s)}</option>" for s in srcs)
@@ -65,13 +93,13 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
     for jid, rec in inbox:
         j, e = rec["job"], rec["eval"]
         sc = e.get("score", 0)
-        seen, saved = bool(rec.get("seen")), bool(rec.get("saved"))
+        saved = bool(rec.get("saved"))
         all_kw = e.get("matched_pos") or []
         kw = "、".join(all_kw[:3]) + ("…" if len(all_kw) > 3 else "")
         hay = " ".join([j.get("title", ""), j.get("company", ""),
                         j.get("location", ""), j.get("source", ""), kw]).lower()
         body.append(
-            f"<tr class='row' data-id='{jid}' data-seen='{int(seen)}' data-saved='{int(saved)}' "
+            f"<tr class='row' data-id='{jid}' data-saved='{int(saved)}' "
             f"data-score='{sc}' data-src='{E(j.get('source',''))}' "
             f"data-title='{E(j.get('title',''))}' data-company='{E(j.get('company',''))}' "
             f"data-hay='{E(hay)}'>"
@@ -84,11 +112,10 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
             f"<td class='meta' title='{E(j.get('location',''))}'>{E(j.get('location',''))}</td>"
             f"<td class='meta' title='{E('、'.join(all_kw))}'>{E(kw)}</td>"
             f"<td class='acts'>"
-            f"<button class='ico act-seen{' on' if seen else ''}' data-id='{jid}' "
-            f"title='{'已儲存的不用再標看過' if saved else '看過了，從清單收起來'}'"
-            f"{' disabled' if saved else ''}>✓</button>"
+            f"<button class='ico act-seen' data-id='{jid}' "
+            f"title='看過了，從清單收起來'>✓</button>"
             f"<button class='ico star act-save{' on' if saved else ''}' data-id='{jid}' "
-            f"title='{'已儲存' if saved else '儲存，進到適合度分析'}'"
+            f"title='{'已儲存' if saved else '儲存，進到契合度診斷'}'"
             f"{' disabled' if saved else ''}>{'★' if saved else '☆'}</button>"
             f"</td></tr>"
         )
@@ -104,12 +131,12 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
 
     table = (
         "<div class='tw'><table id='t'><colgroup>"
-        "<col style='width:30px'><col style='width:96px'><col>"
-        "<col style='width:130px'><col style='width:76px'><col style='width:48px'>"
-        "<col style='width:118px'><col style='width:170px'><col style='width:84px'>"
+        "<col style='width:30px'><col style='width:72px'><col style='width:246px'>"
+        "<col style='width:126px'><col style='width:72px'><col style='width:48px'>"
+        "<col style='width:112px'><col><col style='width:84px'>"
         "</colgroup><thead><tr>"
         "<th class='nosort'></th>"
-        "<th data-k='score' data-num='1' class='rt'>適合度評分<span class='ind'></span></th>"
+        "<th data-k='score' data-num='1' class='rt'>評分<span class='ind'></span></th>"
         "<th data-k='title'>職缺<span class='ind'></span></th>"
         "<th data-k='company'>公司<span class='ind'></span></th>"
         "<th data-k='src'>來源<span class='ind'></span></th>"
@@ -124,34 +151,30 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
     content = (
         "<div class='head'><div class='kicker'>第一步 · 取捨</div>"
         "<h1>職缺收件匣</h1>"
-        "<p>這批搜尋結果裡，哪些值得留下？適合度評分只看關鍵字命中，"
-        "用它判斷搜尋詞抓得準不準，不是判斷該不該投。</p></div>"
+        "<p>這批搜尋結果裡，哪些值得留下？評分只看關鍵字命中，"
+        "用它判斷搜尋詞抓得準不準，不是判斷該不該投。"
+        "<b>✓</b> 收起來、<b>☆</b> 存進契合度診斷。</p></div>"
         "<div class='bar'>"
         "<label>搜尋 <input type='search' id='q' placeholder='職缺／公司／地點／關鍵字'></label>"
         f"<label>來源 <select id='fsrc'><option value=''>全部</option>{src_opts}</select></label>"
         "<label>評分 ≥ <select id='fmin'><option value='0'>不限</option>"
         "<option value='50'>50</option><option value='75'>75</option></select></label>"
-        f"<button class='lnk' id='toggleSeen' data-on='0'>已看過 "
-        f"<b id='seenN'>{hidden}</b> 筆 · 顯示</button>"
+        f"<button class='lnk' data-open='seenDlg'>已看過 <b>{len(dismissed)}</b> 筆</button>"
         "<span class='sp' id='cnt'></span></div>"
         + table
+        + dialog("seenDlg", "已看過", "按了 ✓ 收起來的職缺。下次自動搜尋也不會再出現。"
+                 "想放回清單就按右邊的按鈕。", dismissed, "seen", "放回清單")
     )
 
     js = """
     var rows=[].slice.call(document.querySelectorAll('tr.row'));
     var q=document.getElementById('q'),fsrc=document.getElementById('fsrc'),
-        fmin=document.getElementById('fmin'),cnt=document.getElementById('cnt'),
-        tSeen=document.getElementById('toggleSeen'),seenN=document.getElementById('seenN');
-    function hiddenCount(){
-      return rows.filter(function(r){
-        return r.dataset.seen==='1'&&r.dataset.saved!=='1';}).length;
-    }
+        fmin=document.getElementById('fmin'),cnt=document.getElementById('cnt');
     function apply(){
       var t=(q.value||'').trim().toLowerCase(),s=fsrc.value,
-          m=parseInt(fmin.value||'0',10),showSeen=tSeen&&tSeen.dataset.on==='1',n=0;
+          m=parseInt(fmin.value||'0',10),n=0;
       rows.forEach(function(r){
-        var ok=true;
-        if(r.dataset.seen==='1'&&r.dataset.saved!=='1'&&!showSeen) ok=false;
+        var ok = r.dataset.gone!=='1';
         if(ok&&s&&r.dataset.src!==s) ok=false;
         if(ok&&m&&parseInt(r.dataset.score,10)<m) ok=false;
         if(ok&&t&&r.dataset.hay.indexOf(t)===-1) ok=false;
@@ -161,48 +184,32 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
         if(ok)n++;
       });
       cnt.textContent='顯示 '+n+' 筆';
-      if(seenN){
-        var h=hiddenCount();
-        seenN.textContent=h;
-        tSeen.style.display=h?'':'none';
-        tSeen.lastChild.textContent = tSeen.dataset.on==='1'?' 筆 · 收起':' 筆 · 顯示';
-      }
     }
     [q,fsrc,fmin].forEach(function(el){
       el.addEventListener(el.type==='search'?'input':'change',apply);});
-    if(tSeen) tSeen.onclick=function(){
-      tSeen.dataset.on = tSeen.dataset.on==='1'?'0':'1';
-      tSeen.classList.toggle('on', tSeen.dataset.on==='1');
-      apply();
-    };
 
     function rowOf(id){return rows.filter(function(r){return r.dataset.id===id;})[0];}
+    // ✓ 看過 → 該列立刻消失。要放回來得從篩選列的「已看過」彈窗。
     document.querySelectorAll('.act-seen').forEach(function(btn){
       btn.onclick=function(){
-        var r=rowOf(btn.dataset.id), on=r.dataset.seen!=='1';
-        NR.patch(btn.dataset.id,'seen',on,btn,function(){
-          r.dataset.seen=on?'1':'0';
-          btn.classList.toggle('on',on);
-          apply();
+        var r=rowOf(btn.dataset.id);
+        NR.patch(btn.dataset.id,'seen',true,btn,function(){
+          r.dataset.gone='1'; apply();
         });
       };
     });
+    // ☆ 儲存 → 只做儲存。不碰「看過」，那是 ✓ 的事，該列也留著。
     document.querySelectorAll('.act-save').forEach(function(btn){
       btn.onclick=function(){
         if(btn.disabled) return;
-        var r=rowOf(btn.dataset.id);
+        rowOf(btn.dataset.id).dataset.saved='1';
         NR.patch(btn.dataset.id,'saved',true,btn,function(){
-          r.dataset.saved='1'; r.dataset.seen='1';
           btn.textContent='★'; btn.classList.add('on');
-          btn.disabled=true; btn.title='已儲存（要取消請到適合度分析頁）';
-          var sb=r.querySelector('.act-seen');
-          if(sb){ sb.classList.add('on'); sb.disabled=true;
-                  sb.title='已儲存的不用再標看過'; }
-          apply();
+          btn.disabled=true; btn.title='已儲存（要取消請到契合度診斷頁）';
         });
       };
     });
-    NR.sortable('t',rows); NR.expanders(); apply();
+    NR.sortable('t',rows); NR.expanders(); NR.dialogs(); apply();
     """
     doc = ui.page("職缺收件匣 · NextRole", "inbox", cnt, content, js)
     return _write(path, doc)
@@ -218,6 +225,8 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
     saved = bd.in_stage(b, "saved")
     saved.sort(key=lambda kv: (kv[1].get("fit", {}).get("total") or -1,
                                kv[1]["eval"].get("score", 0)), reverse=True)
+    removed = sorted(bd.removed_from_analysis(b),
+                     key=lambda kv: kv[1]["eval"].get("score", 0), reverse=True)
 
     rated = [r for _, r in saved if (r.get("fit") or {}).get("total") is not None]
     go = [r for r in rated if r["fit"]["verdict"] == "投"]
@@ -268,7 +277,7 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
             f"<div class='an-co mono'>{E(j.get('company',''))}　·　{E(j.get('location',''))}</div>"
             f"<h3>{job_link(j)}</h3>"
             f"{blocker}"
-            f"<div class='an-m'>適合度評分 <b>{e.get('score',0)}</b></div>"
+            f"<div class='an-m'>評分 <b>{e.get('score',0)}</b></div>"
             f"<div>{''.join(f'<span class=tok>{E(k)}</span>' for k in all_kw[:6])}</div>"
             f"{jd_html}"
             "<div class='an-act'>"
@@ -295,10 +304,13 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
         "<div class='bar'>"
         "<label>搜尋 <input type='search' id='q' placeholder='職缺／公司'></label>"
         "<label><input type='checkbox' id='funrated'> 只看還沒診斷的</label>"
+        f"<button class='lnk' data-open='outDlg'>已移出 <b>{len(removed)}</b> 筆</button>"
         "<span class='sp' id='cnt'></span></div>"
         + ("<div class='ancol'>" + "\n".join(cards) + "</div>" if saved else empty(
-            "還沒有要分析的職缺",
-            "去<a href='inbox.html'>職缺收件匣</a>把想投的按「☆ 儲存」，它們就會出現在這裡。"))
+            "還沒有要診斷的職缺",
+            "去<a href='inbox.html'>職缺收件匣</a>把想投的按「☆」，它們就會出現在這裡。"))
+        + dialog("outDlg", "已移出", "從契合度診斷移出去的職缺。診斷結果會留著，"
+                 "放回來就看得到。", removed, "saved", "放回診斷")
     )
 
     js = """
@@ -308,33 +320,30 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
     function apply(){
       var t=(q?q.value:'').trim().toLowerCase(),n=0;
       cards.forEach(function(c){
-        var ok=true;
-        if(fu&&fu.checked&&c.dataset.rated==='1') ok=false;
+        var ok = c.dataset.gone!=='1';
+        if(ok&&fu&&fu.checked&&c.dataset.rated==='1') ok=false;
         if(ok&&t&&c.innerText.toLowerCase().indexOf(t)===-1) ok=false;
         c.style.display=ok?'':'none'; if(ok)n++;
       });
-      if(cnt) cnt.textContent='顯示 '+n+' / '+cards.length+' 筆';
+      if(cnt) cnt.textContent='顯示 '+n+' 筆';
     }
     if(q) q.addEventListener('input',apply);
     if(fu) fu.addEventListener('change',apply);
     document.querySelectorAll('.act-apply').forEach(function(btn){
       btn.onclick=function(){
         NR.patch(btn.dataset.id,'status','applied',btn,function(){
-          var c=btn.closest('.an');
-          c.style.opacity=.4;
-          btn.textContent='已移到投遞追蹤';
-          btn.disabled=true;
+          btn.closest('.an').dataset.gone='1'; apply();
         });
       };
     });
     document.querySelectorAll('.act-unsave').forEach(function(btn){
       btn.onclick=function(){
         NR.patch(btn.dataset.id,'saved',false,btn,function(){
-          btn.closest('.an').style.display='none'; apply();
+          btn.closest('.an').dataset.gone='1'; apply();
         });
       };
     });
-    apply();
+    NR.dialogs(); apply();
     """
     doc = ui.page("契合度診斷 · NextRole", "analysis", cnt, content, js)
     return _write(path, doc)
@@ -395,7 +404,7 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
         "<th data-k='title'>職缺<span class='ind'></span></th>"
         "<th data-k='company'>公司<span class='ind'></span></th>"
         "<th class='nosort rt'>契合度</th>"
-        "<th data-k='applied' class='rt'>投遞日<span class='ind'></span></th>"
+        "<th data-k='applied'>投遞日<span class='ind'></span></th>"
         "<th class='nosort'>備註</th>"
         "</tr></thead><tbody>" + "\n".join(body) + "</tbody></table></div>"
     ) if tracked else empty(
@@ -460,7 +469,7 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
         });
       };
     });
-    NR.sortable('t',rows); apply();
+    NR.sortable('t',rows); NR.dialogs(); apply();
     """
     doc = ui.page("投遞追蹤 · NextRole", "tracker", cnt, content, js)
     return _write(path, doc)

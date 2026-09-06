@@ -82,7 +82,7 @@ def _empty_fit():
 def _migrate(b: dict) -> bool:
     """升級舊版 board.json。回傳有沒有真的改到。"""
     v = b.get("version", 1)
-    if v >= 3:
+    if v >= 4:
         return False
     if v < 2:
         for rec in b.get("jobs", {}).values():
@@ -93,14 +93,17 @@ def _migrate(b: dict) -> bool:
             st = rec.get("status")
             if st in _V2_STATUS:
                 rec["status"] = _V2_STATUS[st]
-    b["version"] = 3
+    if v < 4:
+        for rec in b.get("jobs", {}).values():
+            rec.setdefault("ever_saved", bool(rec.get("saved") or rec.get("status")))
+    b["version"] = 4
     return True
 
 
 def load() -> dict:
     b = store.read_json(store.BOARD)
     if b is None:
-        b = {"version": 3, "updated_at": store.now(), "jobs": {}}
+        b = {"version": 4, "updated_at": store.now(), "jobs": {}}
     b.setdefault("jobs", {})
     if _migrate(b):
         store.write_json(store.BOARD, b)
@@ -117,6 +120,18 @@ def stage_of(rec: dict) -> str:
 
 def in_stage(b: dict, stage: str) -> list[tuple[str, dict]]:
     return [(jid, r) for jid, r in b["jobs"].items() if stage_of(r) == stage]
+
+
+def dismissed(b: dict) -> list[tuple[str, dict]]:
+    """收件匣按了勾勾收起來的（看過、沒存、沒投）。"""
+    return [(jid, r) for jid, r in b["jobs"].items()
+            if r.get("seen") and not r.get("saved") and not r.get("status")]
+
+
+def removed_from_analysis(b: dict) -> list[tuple[str, dict]]:
+    """曾經存進分析頁、後來又移出的。"""
+    return [(jid, r) for jid, r in b["jobs"].items()
+            if r.get("ever_saved") and not r.get("saved") and not r.get("status")]
 
 
 def save(b: dict):
@@ -148,6 +163,7 @@ def merge(scored: list[dict], board: dict | None = None) -> dict:
                 "fit": _empty_fit(),
                 "seen": False,
                 "saved": False,
+                "ever_saved": False,
                 "status": None,
                 "notes": "",
                 "first_seen": ts,
@@ -178,9 +194,10 @@ def patch(jid: str, fields: dict, board: dict | None = None) -> dict:
         if st is not None and st not in STATUSES:
             raise ValueError(f"未知狀態：{st}")
         if st is not None:
-            # 投遞就代表這筆一定看過也存過，補齊避免三頁狀態不一致
-            rec["seen"] = True
+            # 投遞就代表這筆一定存過（要先進分析頁才投得出去）。
+            # 但「看過」是另一回事 —— 那是收件匣的取捨動作，不要替使用者按。
             rec["saved"] = True
+            rec["ever_saved"] = True
             if not rec.get("applied_at"):
                 rec["applied_at"] = store.now()[:10]     # 只記日期，跟頁面上的日期選擇器一致
         rec["status"] = st
@@ -189,7 +206,7 @@ def patch(jid: str, fields: dict, board: dict | None = None) -> dict:
     if "saved" in fields:
         rec["saved"] = bool(fields["saved"])
         if rec["saved"]:
-            rec["seen"] = True          # 存起來就算看過了，收件匣不用再出現
+            rec["ever_saved"] = True    # 記著曾經存過，移出分析後才找得回來
     if "applied_at" in fields:
         d = (fields["applied_at"] or "").strip()
         if d and not _DATE_RE.match(d):
