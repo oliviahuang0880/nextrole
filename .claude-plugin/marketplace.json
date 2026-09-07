@@ -10,5 +10,5 @@
       "description": "求職全流程：搜職缺、取捨、契合度診斷、客製履歷、面試題、模擬面試、投遞追蹤。"
     }
   ],
-  "description": "Olivia 的求職工具。目前只有 nextrole 一個 plugin。"
+  "description": "求職工具的 plugin marketplace。目前收錄 nextrole 一個 plugin。"
 }
