@@ -294,6 +294,40 @@ def main():
     except SystemExit as exc:
         check("貼給我" in str(exc), "沒見過的副檔名也給得出出路")
 
+    print("\n[7f] 貼進來的 JD 進得了看板，而且不會製造重複")
+    import add_job as aj
+    import score as sc
+    JD = "負責需求蒐集與排序，主持跨部門會議，執行使用者訪談並定義成效指標。" * 6
+    def paste(company, title, url=""):
+        job = {"source": "貼上", "title": title, "company": company,
+               "url": url or aj.synth_url(company, title), "location": "",
+               "description": JD, "salary": None, "remote": False}
+        ev = sc.score_job(job, bd.store.load_config() and {} or {})
+        bd.merge([{"job": job, "eval": ev}])
+        jid = store.job_id(job["url"])
+        bd.patch(jid, {"saved": True})
+        return jid
+    n0 = len(bd.load()["jobs"])
+    jid1 = paste("某某科技", "產品經理")
+    check(len(bd.load()["jobs"]) == n0 + 1, "貼一份沒有網址的 JD 會多一筆")
+    check(bd.stage_of(bd.load()["jobs"][jid1]) == "saved", "貼進來的直接進契合度診斷頁")
+    jid2 = paste("某某科技", "產品經理")
+    check(jid2 == jid1 and len(bd.load()["jobs"]) == n0 + 1,
+          "同一家同一個職缺再貼一次不會變成兩筆")
+    check(store.job_id(aj.synth_url("A公司", "PM")) != store.job_id(aj.synth_url("B公司", "PM")),
+          "不同公司的合成網址不會撞在一起")
+    # ⭐ 帶著看板上既有的網址貼 → 併進那一筆，使用者的判斷一律不動
+    bd.set_fit(jid1, {"industry": 3, "overlap": 4, "condition": 4, "hard_blocker": False})
+    bd.patch(jid1, {"status": "applied", "notes": "貼進來之後投了"})
+    before = bd.load()["jobs"][jid1]
+    paste("改個名字", "改個職稱", url=before["job"]["url"])
+    after = bd.load()["jobs"][jid1]
+    check(len(bd.load()["jobs"]) == n0 + 1, "帶既有網址貼不會新增，是併進去")
+    check(after["fit"]["total"] == before["fit"]["total"]
+          and after["status"] == before["status"]
+          and after["notes"] == before["notes"],
+          "併進去之後契合度／狀態／備註都沒被洗掉")
+
     print("\n[8] 零個人資料：暫存 HOME 以外什麼都沒寫")
     check(store.ROOT.startswith(_TMP), f"所有寫入都在暫存區（{store.ROOT}）")
 
