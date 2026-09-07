@@ -169,12 +169,11 @@ tr.row.dim{color:var(--ink-faint)}
 tr.row.dim a{color:#8fa8c4}
 /* 數字欄一律靠右，位數才對得齊 */
 td.num,th.rt{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
-td.rt{text-align:right}
 td.num .badge{min-width:38px;justify-content:center}
 /* 內容是徽章或按鈕的欄不做截字：元素本身就比文字寬，只要欄寬不夠，
    ellipsis 就會在徽章旁邊多畫一個「…」出來。欄寬也要留得下
    badge(38) + 左右 gutter(2×--gut)。 */
-td.num,td.acts,td.ctr,td.rt{text-overflow:clip}
+td.num,td.acts,td.ctr,td.lnk-c{text-overflow:clip}
 /* 投遞追蹤的「面試題」欄：連到那家公司的試算表頁籤 */
 a.sheet{color:var(--navy-cobalt);font-weight:600;font-size:12px;text-decoration:none}
 a.sheet:hover{text-decoration:underline}
