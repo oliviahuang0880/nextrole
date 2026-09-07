@@ -22,7 +22,9 @@ description: 針對單一職缺客製履歷與求職信（104 投遞訊息）。
 
 1. READ 確認 `~/.nextrole/kit/facts.md` 與 `~/.nextrole/resumes/` 底下有主履歷。
    - 沒有主履歷 → 請使用者貼上或指路徑，存成 `~/.nextrole/resumes/master-<id>.md`。
-   - `facts.md` 是空的 → 先跑 `/nextrole:interview` 的素材建檔，或請他直接貼經歷。
+   - `facts.md` 是空的但**主履歷有內容** → 直接開工，主履歷本身就是素材。
+     `facts.md` 是補充（數字口徑、履歷放不下的細節），不是前提，不要為了它擋住流程。
+   - 主履歷和 `facts.md` **兩邊都空** → 請他貼經歷，或先跑 `/nextrole:interview` 建素材。
 2. READ 拿 JD。從看板來就讀 `board.json` 的 `job.description`；使用者直接貼就用貼的，
    並問要不要把這筆加進看板。
 3. READ 讀 `~/.nextrole/kit/voice.md`（口徑與地雷）。**每次產出前都要讀** — 這份擋的是
@@ -55,17 +57,26 @@ description: 針對單一職缺客製履歷與求職信（104 投遞訊息）。
 1. WRITE **履歷** `~/.nextrole/resumes/<job_id>/resume.md`
    - 開頭加一段 `> 客製方向：<這份 JD 的重心>｜底本：<哪一版>`，之後回頭看才知道當初為什麼這樣改。
    - 照 `rules/客製化判準.md` 動刀：調順序、換措辭、把命中 JD 的既有實績補上來、把不相關的縮短。
-2. WRITE **求職信** `~/.nextrole/resumes/<job_id>/cover-letter.md`
+2. READ ⭐ **寫求職信之前先去看這家公司。** 第 ④ 段要引一句「只有他們有」的具體事實，
+   JD 上找得到的都太淺。開 `job.url`、公司官網、產品頁、定價頁，挖一個具體的東西：
+   他們的產品怎麼收費、服務哪一種客戶、最近出了什麼、產品頁上哪一句話透露他們在意什麼。
+
+   ⛔ **挖不到就停下來問使用者，不要自己編。** 公司網站進不去、或這筆職缺沒有可查的來源時，
+   把第 ④ 段留白並在檔案裡註明缺什麼，交給使用者補。編一句「我很欣賞貴公司在 X 領域的投入」
+   是這個 skill 最嚴重的違規：它讀起來很順，使用者不會發現，面試被問到就穿幫。
+   判準說得很清楚 —— 換成競爭對手還成立的信就是零分。
+3. WRITE **求職信** `~/.nextrole/resumes/<job_id>/cover-letter.md`
    - 讀 `rules/求職信結構.md`（四段結構、字數上限讀 `config.json`）。
    - 讀 `rules/去AI味檢查.md`，**一開始就照著寫，不是事後洗**。
-3. WRITE 產可列印版：
+   - 交稿前搜一次 `—` 與 `——`，這是最常漏的一條。
+4. WRITE 產可列印版：
 
    ```bash
    cd ~/.nextrole/bin && uv run render_resume.py ~/.nextrole/resumes/<job_id>/resume.md
    ```
 
    告訴使用者：瀏覽器開啟後 Cmd+P 就能存成 PDF。
-4. WRITE 給使用者審核。修到他滿意為止。
+5. WRITE 給使用者審核。修到他滿意為止。
 
 ## Phase 4 -- 收尾
 
