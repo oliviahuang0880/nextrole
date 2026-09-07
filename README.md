@@ -162,6 +162,17 @@ uv run scripts/demo_data.py
 ⚠️ 改了 `ui.py` 或 `render_board.py` 之後**要重開 `serve.py`** ——
 它把模組留在記憶體裡，每次寫回都會用舊的那份重畫，會蓋掉你手動產生的檔案。
 
+⚠️ 改了任何 `SKILL.md` 之後，slash command 不會馬上跟著變。它讀的是 plugin 快取，
+不是這個工作目錄。要三步，缺一不可：
+
+```bash
+claude plugin marketplace update nextrole && claude plugin update nextrole@nextrole
+```
+
+然後**重開 Claude Code**。注意是 `plugin update` 不是 `plugin install` ——
+對已經裝好的 plugin，`install` 是 no-op，會安靜地什麼都不做。
+（Python 腳本不受影響，它們走 `~/.nextrole/bin` symlink，指到這個工作目錄，改了即時生效。）
+
 版面規範在 [`design.md`](design.md)。改任何一頁之前先讀那份，
 樣式一律寫在 `scripts/ui.py` 的共用 CSS，不要為單一頁另寫。
 
