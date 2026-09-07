@@ -166,14 +166,16 @@ export PROXY_URL_HTTPS=http://host:port
 
 ## 開發
 
-想看版面長怎樣（不用真的跑爬蟲）：
+想看版面長怎樣、又不想真的跑爬蟲，就自己餵一份假的職缺快取：
+把一個 job 陣列（`source`／`title`／`company`／`url`／`location`／`description`）
+寫進 `~/.nextrole/output/_jobs_cache.json`，再跑
 
 ```bash
-uv run scripts/demo_data.py
+uv run scripts/run_search.py --from-cache
 ```
 
-會產一份 60 筆的虛構資料到 `~/.nextrole-demo/`，**不會碰到你自己的 `~/.nextrole/`**。
-跑完照它印的指令開 server 就能點。截圖也用這份，不會截到真實職缺。
+它會走完整的評分、過濾、去重與看板合併，只是不連網路。
+⚠️ 快取不存在時 `--from-cache` 會直接報錯，不會偷偷改去爬。
 
 ⚠️ 改了 `ui.py` 或 `render_board.py` 之後**要重開 `serve.py`** ——
 它把模組留在記憶體裡，每次寫回都會用舊的那份重畫，會蓋掉你手動產生的檔案。

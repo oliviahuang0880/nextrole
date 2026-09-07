@@ -74,8 +74,8 @@ def audit_repo(root: str) -> list[str]:
     hits = []
     files = subprocess.run(["git", "-C", root, "ls-files"], capture_output=True,
                            text=True, check=True).stdout.split()
-    # selftest 本身寫著那些樣態；demo_data 的內容全部是虛構樣板（薪資帶也是假的）
-    skip = {"scripts/selftest.py", "scripts/demo_data.py"}
+    # selftest 本身就寫著那些樣態，掃到自己不算
+    skip = {"scripts/selftest.py"}
     for rel in files:
         if rel in skip:
             continue
