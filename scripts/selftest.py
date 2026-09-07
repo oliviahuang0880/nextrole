@@ -106,6 +106,9 @@ def _score_all(jobs):
     return out
 
 
+SHEET_URL = "https://docs.google.com/spreadsheets/d/SELFTEST/edit#gid=1"
+
+
 def main():
     print(f"暫存 HOME：{_TMP}")
 
@@ -181,6 +184,7 @@ def main():
             check(True, f"擋下 {list(bad)[0]}")
 
     print("\n[7] 產出三頁")
+    bd.set_artifact(jid, "sheet_tab", SHEET_URL)
     third = store.job_id(JOBS[2]["url"])          # 存了但還沒診斷的，用來檢查未評分那一格
     bd.patch(third, {"saved": True})
     paths = render_board.render_all(bd.load(), cfg)
@@ -189,7 +193,15 @@ def main():
     for name, doc in docs.items():
         check("{{" not in doc, f"{name} 沒有殘留 {{{{ 填位符號")
     check("8/30 投遞" in docs["tracker.html"], "備註畫在投遞追蹤頁")
-    check("10" in docs["tracker.html"], "契合度畫在投遞追蹤頁")
+    # ⚠️ 這裡曾經寫成 check("10" in tracker.html)，而 colgroup 的 108px 剛好含有 "10"，
+    # 所以欄位被拿掉之後斷言還是綠的。比對頁面內容一律用夠獨特的字串。
+    tr = docs["tracker.html"]
+    check("<th class='nosort'>面試題</th>" in tr, "投遞追蹤有『面試題』欄")
+    # 導覽列會有「契合度診斷」（那是第二頁的名字），CSS 註解也有，所以只比對表頭
+    heads = tr[tr.index("<thead>"):tr.index("</thead>")]
+    check("契合度" not in heads,
+          "投遞追蹤的表頭不再有契合度欄（那是投之前的判斷，投出去就用不到了）")
+    check(SHEET_URL in tr and "class='sheet'" in tr, "有試算表頁籤時畫成連結")
     check("act-save" in docs["inbox.html"], "收件匣有儲存按鈕")
     check(">評分<" in docs["inbox.html"], "收件匣的欄位叫『評分』")
     check("seenDlg" in docs["inbox.html"], "收件匣有『已看過』彈窗")

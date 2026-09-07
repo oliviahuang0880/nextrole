@@ -397,14 +397,17 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
     body = []
     for jid, rec in tracked:
         j = rec["job"]
-        fit = rec.get("fit") or {}
         st = rec["status"]
         sel = "".join(
             f"<option value='{k}'{' selected' if k == st else ''}>{bd.STATUS_ZH[k]}</option>"
             for k in bd.STATUSES
         )
-        vc = verdict_class(rec, cfg["fit_threshold"])
         applied = (rec.get("applied_at") or "")[:10]
+        # 面試題的試算表頁籤。投遞之後真正每天要點的是這個，不是分數 ——
+        # 分數是投之前的判斷，投出去就用不到了。
+        tab = (rec.get("artifacts") or {}).get("sheet_tab")
+        sheet = (f"<a class='sheet' href='{E(tab)}' target='_blank' rel='noopener'>開啟</a>"
+                 if tab else "<span class='meta'>—</span>")
         body.append(
             f"<tr class='row{' dim' if st in bd.ENDED else ''}' data-id='{jid}' "
             f"data-status='{st}' data-applied='{applied}' "
@@ -413,9 +416,7 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
             f"<td><select class='st' data-id='{jid}'>{sel}</select></td>"
             f"<td class='ttl' title='{E(j.get('title',''))}'>{job_link(j)}</td>"
             f"<td class='co'>{E(j.get('company',''))}</td>"
-            f"<td class='num'>" + (f"<span class='badge b-{vc}'>{fit['total']}</span>"
-                                   if fit.get("total") is not None else
-                                   "<span class='meta'>—</span>") + "</td>"
+            f"<td class='ctr'>{sheet}</td>"
             f"<td><input type='date' class='dt' data-id='{jid}' value='{E(applied)}'></td>"
             f"<td><textarea class='nt' data-id='{jid}' placeholder='備註'>"
             f"{E(rec.get('notes',''))}</textarea></td></tr>"
@@ -429,7 +430,7 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
         "<th class='nosort'>狀態</th>"
         "<th data-k='title'>職缺<span class='ind'></span></th>"
         "<th data-k='company'>公司<span class='ind'></span></th>"
-        "<th class='nosort rt'>契合度</th>"
+        "<th class='nosort'>面試題</th>"
         "<th data-k='applied'>投遞日<span class='ind'></span></th>"
         "<th class='nosort'>備註</th>"
         "</tr></thead><tbody>" + "\n".join(body) + "</tbody></table></div>"

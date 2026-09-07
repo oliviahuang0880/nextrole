@@ -168,6 +168,9 @@ td.num .badge{min-width:38px;justify-content:center}
    ellipsis 就會在徽章旁邊多畫一個「…」出來。欄寬也要留得下
    badge(38) + 左右 gutter(2×--gut)。 */
 td.num,td.acts,td.ctr{text-overflow:clip}
+/* 投遞追蹤的「面試題」欄：連到那家公司的試算表頁籤 */
+a.sheet{color:var(--navy-cobalt);font-weight:600;font-size:12px;text-decoration:none}
+a.sheet:hover{text-decoration:underline}
 td.ttl a{display:block;overflow:hidden;text-overflow:ellipsis;color:var(--ink);
   font-weight:600;font-size:13px}
 td.ttl a:hover{color:var(--navy-cobalt)}
