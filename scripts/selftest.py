@@ -181,6 +181,8 @@ def main():
             check(True, f"擋下 {list(bad)[0]}")
 
     print("\n[7] 產出三頁")
+    third = store.job_id(JOBS[2]["url"])          # 存了但還沒診斷的，用來檢查未評分那一格
+    bd.patch(third, {"saved": True})
     paths = render_board.render_all(bd.load(), cfg)
     check(len(paths) == 3, f"產出三個檔案（{[os.path.basename(p) for p in paths]}）")
     docs = {os.path.basename(p): open(p, encoding="utf-8").read() for p in paths}
@@ -192,6 +194,17 @@ def main():
     check(">評分<" in docs["inbox.html"], "收件匣的欄位叫『評分』")
     check("seenDlg" in docs["inbox.html"], "收件匣有『已看過』彈窗")
     check("outDlg" in docs["analysis.html"], "診斷頁有『已移出』彈窗")
+    # 未評分的卡片要自己講出「下一步在對話裡」，不然使用者會在頁面上找按鈕
+    an = docs["analysis.html"]
+    check("未評分" in an and "data-say='" in an, "存了但還沒診斷的會畫成未評分那一格")
+    i = an.index("data-say='")
+    say = an[i + 10:an.index("'", i + 10)]
+    third_job = bd.load()["jobs"][third]["job"]
+    check("幫我評" in say, f"未評分的卡片給得出可以複製的那句話（{say}）")
+    import html as _h                      # say 是 HTML 屬性值，比對前要照樣跳脫
+    check(_h.escape(third_job["company"]) in say and _h.escape(third_job["title"]) in say,
+          "那句話同時帶了公司名與職稱，同名職缺才分得出來")
+    check("btn-g act-apply" in an, "還沒診斷時「開始投遞」降成次要樣式")
     check("契合度診斷" in docs["analysis.html"], "第二頁叫契合度診斷")
     check("薪資" not in docs["inbox.html"] and "薪資" not in docs["analysis.html"],
           "薪資已經不顯示")

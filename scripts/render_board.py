@@ -247,10 +247,17 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
         blocked = fit.get("hard_blocker")
 
         if total is None:
+            # 未評分時，這一格要負責告訴使用者「下一步在對話裡」。
+            # 之前只有一行灰色小字，使用者看不到，會在頁面上找按鈕找半天。
+            # 職稱常常重複（好幾家同時在招「使用者研究員」），一定要帶公司名才指得準
+            say = f"幫我評 {j.get('company','')} 的「{j.get('title','')}」"
             score_block = (
                 "<div class='ring n'><span>—</span><small>未評分</small></div>"
-                "<p class='meta' style='margin:10px 0 0;font-size:12px;color:var(--ink-muted)'>"
-                "還沒診斷。跟 Claude 說「幫我評這筆」，或用 <code>/nextrole:board</code>。</p>"
+                "<div class='todo'><b>還沒診斷</b>"
+                "<p>診斷在對話裡做，畫面只負責顯示結果。跟 Claude 說這句就會開始：</p>"
+                f"<code class='say'>{E(say)}</code>"
+                f"<button class='btn btn-s copy' data-say='{E(say)}'>複製這句</button>"
+                "</div>"
             )
             bars = ""
         else:
@@ -290,7 +297,12 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
             f"<div>{''.join(f'<span class=tok>{E(k)}</span>' for k in all_kw[:6])}</div>"
             f"{jd_html}"
             "<div class='an-act'>"
-            f"<button class='btn btn-p act-apply' data-id='{jid}'>開始投遞 →</button>"
+            # 還沒診斷就把「開始投遞」降成次要樣式：投不投還沒判斷，
+            # 它不該是這張卡上最醒目的動作。不停用 —— 使用者要直接投是他的自由。
+            f"<button class='btn {'btn-p' if total is not None else 'btn-g'} act-apply' "
+            f"data-id='{jid}'"
+            + ("" if total is not None else " title='還沒做契合度診斷。要直接投也可以。'")
+            + ">開始投遞 →</button>"
             f"<button class='btn btn-g act-unsave' data-id='{jid}'>移出分析</button>"
             + (f"<span class='badge b-n'>已備妥：{'、'.join(done)}</span>" if done else "")
             + "</div></div>"

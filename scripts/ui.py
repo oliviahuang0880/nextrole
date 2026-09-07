@@ -230,6 +230,16 @@ td.acts{text-align:right;white-space:nowrap}
 .ring small{display:block;font-size:11px;color:var(--ink-muted)}
 .ring.hi{border-color:var(--hi)} .ring.mid{border-color:var(--mid)}
 .ring.risk{border-color:var(--risk)} .ring.n{border-style:dashed}
+/* 未評分那一格：下一步在對話裡，畫面要講出來。原本只有一行灰色小字，
+   使用者看不到，會在頁面上找「分析」按鈕找半天。 */
+.todo{margin-top:12px;padding:12px;border:1px solid var(--border);border-radius:8px;
+  background:var(--surface-alt);text-align:left}
+.todo b{display:block;font-size:13px;color:var(--ink);margin-bottom:4px}
+.todo p{margin:0 0 8px;font-size:12px;line-height:1.5;color:var(--ink-muted)}
+.say{display:block;padding:8px 10px;margin-bottom:8px;border-radius:6px;
+  background:#fff;border:1px solid var(--border-strong);
+  font-size:12px;line-height:1.5;color:var(--ink);word-break:break-all}
+.todo .copy{width:100%;justify-content:center}
 .verdict{text-align:center;margin-bottom:14px}
 .ind{margin-bottom:10px}
 .ind-h{display:flex;justify-content:space-between;font-size:11px;color:var(--ink-muted);
@@ -402,6 +412,27 @@ window.NR = (function(){
             function(){ location.reload(); });
     };
   }
+  function copiers(){
+    document.querySelectorAll('button.copy').forEach(function(b){
+      b.onclick=function(){
+        var t=b.dataset.say||'';
+        function done(){ var o=b.textContent; b.textContent='已複製'; 
+          setTimeout(function(){b.textContent=o;},1400); }
+        // localhost 算 secure context，clipboard API 可用；不行就退回選取讓他自己按 Cmd+C
+        if(navigator.clipboard&&navigator.clipboard.writeText){
+          navigator.clipboard.writeText(t).then(done,fallback);
+        } else { fallback(); }
+        function fallback(){
+          var el=b.parentElement.querySelector('.say');
+          if(!el) return;
+          var r=document.createRange(); r.selectNodeContents(el);
+          var sel=window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
+          b.textContent='已選取，按 Cmd+C';
+          setTimeout(function(){b.textContent='複製這句';},2200);
+        }
+      };
+    });
+  }
   function dialogs(){
     document.querySelectorAll('[data-open]').forEach(function(b){
       b.onclick=function(){ document.getElementById(b.dataset.open).showModal(); };
@@ -410,6 +441,7 @@ window.NR = (function(){
       b.onclick=function(){ b.closest('dialog').close(); };
     });
     document.querySelectorAll('.dlg-restore').forEach(wireRestore);
+    copiers();
   }
   // 收起來的東西要「當下」就進彈窗。彈窗內容是伺服器在頁面載入時畫的，
   // 不同步加進去的話，使用者剛按掉的那一筆要重整才看得到 —— 等於沒作用。
