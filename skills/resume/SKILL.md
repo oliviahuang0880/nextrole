@@ -78,14 +78,38 @@ description: 針對單一職缺客製履歷與求職信（104 投遞訊息）。
    那通常就是這家公司真正缺的人，也是履歷該把哪一段拉到前面的依據。
 4. WRITE 把這兩點講給使用者聽，再開始動筆。他不同意就別寫下去。
 
-## Phase 3 -- 產出
+## Phase 3 -- 履歷（先做完這一份，確定了才動求職信）
+
+⭐ **一次只做一件事。** 履歷還沒確定就先寫求職信，等於拿一份還會變的東西
+去寫下一份 —— 履歷一改，求職信的重心也要跟著改，前面那份就白寫了。
 
 1. WRITE **履歷** `~/.nextrole/resumes/<job_id>/resume.md`
-   - 開頭加一段 `> 客製方向：<這份 JD 的重心>｜底本：<哪一版>`，之後回頭看才知道當初為什麼這樣改。
-   - 照 `rules/客製化判準.md` 動刀：調順序、換措辭、把命中 JD 的既有實績補上來、把不相關的縮短。
-2. WRITE **求職信** `~/.nextrole/resumes/<job_id>/cover-letter.md`
-   - 讀 `rules/求職信結構.md`（三件事、四段結構、字數怎麼處理）。
-   - 讀 `rules/去AI味檢查.md`，**一開始就照著寫，不是事後洗**。交稿前搜一次 `—` 與 `——`。
+   - 開頭加一段 `> 客製方向：<這份 JD 的重心>｜底本：<哪一版>｜<日期>`，
+     之後回頭看才知道當初為什麼這樣改。
+   - 照 `rules/客製化判準.md` 動刀：調順序、換措辭、把命中 JD 的既有實績補上來、
+     把不相關的縮短。
+2. WRITE 產可列印版：
+
+   ```bash
+   cd ~/.nextrole/bin && uv run render_resume.py ~/.nextrole/resumes/<job_id>/resume.md
+   ```
+
+   告訴使用者：瀏覽器開啟後 Cmd+P 就能存成 PDF。
+3. WRITE **給使用者審核履歷。** 講清楚你動了哪幾刀、為什麼，以及**沒有補任何東西**。
+   修到他滿意為止。
+   ⛔ **他還沒說「可以」之前，不要開始寫求職信。**
+
+## Phase 4 -- 求職信（履歷確定之後才問）
+
+1. WRITE 履歷定稿之後才問：
+
+   > 「履歷這樣可以的話，要不要順便寫投遞訊息（求職信）？」
+
+   他說不用就跳到 Phase 5，只交履歷。求職信是選配，不是每個人每次都要。
+2. READ 讀 `rules/求職信結構.md`（三件事、四段結構、字數怎麼處理）
+   與 `rules/去AI味檢查.md`（**一開始就照著寫，不是事後洗**）。
+3. WRITE **求職信** `~/.nextrole/resumes/<job_id>/cover-letter.md`
+   - 定稿的履歷是這封信的前提：信裡的重心要跟履歷一致，不要另起爐灶。
    - 第 ④ 段要引具體的一句。**來源優先用 JD 本身**，其次公司介紹；
      已經跑過 `/nextrole:interview` 的「準備一家公司」就直接用那邊的研究成果。
      ⛔ 不要為了寫求職信另外做一輪公司研究，那是面試準備的工作。
@@ -93,29 +117,26 @@ description: 針對單一職缺客製履歷與求職信（104 投遞訊息）。
      這種句子換成任何一家同業都成立，讀起來很順、使用者不會發現，面試被追問就穿幫。
    - 字數：**先寫完整版**，再回報字數與「要壓短該砍哪一段、代價是什麼」，讓使用者決定。
      不要自己先砍掉最有力的一手。
-3. WRITE 產可列印版：
+   - 交稿前搜一次 `—` 與 `——`，這是去 AI 味最常漏的一條。
+4. WRITE 給使用者審核，修到他滿意為止。
 
-   ```bash
-   cd ~/.nextrole/bin && uv run render_resume.py ~/.nextrole/resumes/<job_id>/resume.md
-   ```
-
-   告訴使用者：瀏覽器開啟後 Cmd+P 就能存成 PDF。
-4. WRITE 給使用者審核。修到他滿意為止。
-
-## Phase 4 -- 收尾
+## Phase 5 -- 收尾
 
 1. WRITE 問過使用者之後，才用 `mcp__google_workspace__import_to_google_doc`
    匯出到 Google Docs（帳號讀 `config.json` 的 `google_email`）。沒設定就跳過。
-2. WRITE 寫回看板：
+2. WRITE 寫回看板。**只寫真的產出來的東西** —— 求職信是選配，他說不用就不要寫那一行：
 
    ```bash
-   cd ~/.nextrole/bin && uv run -c "
+   cd ~/.nextrole/bin && uv run python -c "
    import board
-   board.set_artifact('<job_id>','resume','resumes/<job_id>/resume.md')
-   board.set_artifact('<job_id>','cover_letter','resumes/<job_id>/cover-letter.md')"
+   board.set_artifact('<job_id>','resume','resumes/<job_id>/resume.md')"
+   # 有寫求職信才加這一行：
+   # board.set_artifact('<job_id>','cover_letter','resumes/<job_id>/cover-letter.md')
    ```
 
-3. WRITE 順手問要不要把看板狀態改成「想投」或「已投」。
+3. WRITE 順手問要不要更新看板狀態。他真的投出去了就設 `applied`
+   （診斷頁的「開始投遞」按鈕做的是同一件事）；還沒投就什麼都不用改，
+   它會留在契合度診斷頁。
 
 ## 檔案位置
 

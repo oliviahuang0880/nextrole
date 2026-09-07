@@ -76,7 +76,7 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
 7. WRITE 寫回：
 
    ```bash
-   cd ~/.nextrole/bin && uv run -c "
+   cd ~/.nextrole/bin && uv run python -c "
    import board; board.set_fit('<job_id>', {'industry':N,'overlap':N,'condition':N,
                                             'hard_blocker':False,'blocker_note':''})"
    ```
