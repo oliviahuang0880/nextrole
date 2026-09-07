@@ -1,73 +1,85 @@
 ---
 name: setup
-description: NextRole 求職工具的第一次設定與後續改設定：建立本機資料夾 ~/.nextrole/、登記 Google 帳號與面試準備試算表、設定投遞門檻與硬門檻條件、登記履歷版本。使用者說「第一次用 NextRole」「設定求職工具」「改我的求職設定」「登記我的履歷版本」「設定投遞門檻」時使用。也在其他 NextRole skill 發現 ~/.nextrole/config.json 不存在時被叫來補跑。
+description: NextRole 求職工具的初始化與設定檢視：建立本機資料夾 ~/.nextrole/、修復 bin symlink、列出或修改目前設定。使用者說「第一次用 NextRole」「初始化求職工具」「改我的求職設定」「看我的設定」時使用。其他 NextRole skill 發現 ~/.nextrole/ 不存在時也會叫它來補建。
 ---
 
-# NextRole 設定
+# NextRole 初始化
 
-建立與維護 `~/.nextrole/` — 使用者所有個人素材的家。
-**這個 plugin 本身不含任何人的資料**，所有內容都由使用者在這裡自己建。
+建立 `~/.nextrole/` — 使用者所有個人素材的家。
+**這個 plugin 本身不含任何人的資料**，所有內容都由使用者透過工具自己建。
+
+## 設計原則：這裡不問問題
+
+⭐ **setup 只建骨架，不做設定問答。**
+
+設定項目（履歷版本、硬門檻、試算表）**一律由真正要用到的 skill 在需要的那一刻問**：
+
+| 設定 | 誰來問 | 什麼時候問 |
+|---|---|---|
+| `resume_versions` | `/nextrole:resume` | 第一次要客製履歷、而且還沒登記版本時 |
+| `hard_blockers` | `/nextrole:board` | 做契合度診斷時發現了一條，才建議加進去 |
+| `google_email`／`spreadsheet_id` | `/nextrole:interview` | 產出面試題之後、要上傳之前 |
+
+**為什麼**：在使用者還沒有脈絡的時候問，他答不好 —— 問「你有幾種履歷」時他連主履歷都還沒放進來，
+問「你的硬門檻是什麼」時他還沒看過任何 JD。答得敷衍，資料就是壞的。
+到了真正用得到的那一刻，他手上剛好有 JD、有履歷、有面試題，答案才準。
 
 ## Output Contract
 
 - 唯一會寫的地方是 `~/.nextrole/`。不得把使用者的任何素材寫進 plugin 目錄或任何 git repo。
 - `config.json` 只放設定，不放素材。素材放 `kit/`。
-- 每一題都要收到回答才寫入。沒問到的欄位維持 `null`，不要猜。
-- 使用者說「跳過」的題目就留空 — 空欄位是合法狀態，其他 skill 會在需要時再問。
+- 空欄位是**合法且預期**的狀態，不要為了填滿而問。
 
 # SOP
 
 ## Phase 0 -- 建骨架
 
-1. WRITE 跑 `init_store.py`。第一次跑時 `~/.nextrole/bin` 還不存在，用本 plugin 的 `scripts/`：
+1. WRITE 跑 `init_store.py`。
+
+   ⚠️ **第一次跑時 `~/.nextrole/bin` 還不存在**，所以不能用它當路徑。
+   載入這個 skill 時，環境會印出一行 `Base directory for this skill: <路徑>`，
+   腳本就在它的 `../../scripts/`。用那個**絕對路徑**跑：
 
    ```bash
-   uv run "${CLAUDE_PLUGIN_ROOT:-$HOME/.nextrole/bin}/scripts/init_store.py" 2>/dev/null \
-     || uv run ~/.nextrole/bin/init_store.py
+   uv run "<Base directory>/../../scripts/init_store.py"
    ```
 
-   它會建目錄、`bin` symlink、空的 `config.json` 與 `kit/` 範本。已存在的檔案不會被覆寫，可以重複跑。
-2. READ 讀回 `~/.nextrole/config.json`，確認哪些欄位還是 `null` — **只問這些**，已經有值的不要重問。
+   例：base 是 `~/.claude/plugins/cache/nextrole/nextrole/0.3.0/skills/setup`，
+   就跑 `uv run ~/.claude/plugins/cache/nextrole/nextrole/0.3.0/scripts/init_store.py`。
 
-## Phase 1 -- 逐項設定
+   ⛔ 不要用 `$CLAUDE_PLUGIN_ROOT` —— 它在 Bash 工具裡不會被設定，
+   而且第一次跑時 `~/.nextrole/bin` 也還不存在，兩條路都會失敗、什麼都建不出來。
 
-依 `skills/search/rules/提問與選項撰寫判準.md` 的格式提問（一次一題、附選項表、留「其他」）。
-以下每一題都可以跳過。
+   跑完會建目錄、`bin` symlink、空的 `config.json` 與 `kit/` 範本。
+   已存在的檔案不會被覆寫，可以重複跑。之後就能用 `~/.nextrole/bin` 了。
 
-1. WRITE **1a 履歷版本**（`resume_versions`）
-   問：「你手上有幾種履歷？各自是投什麼方向的？」
-   例：一份偏產品經理、一份偏解決方案顧問。寫成 `[{"id":"pm","label":"PM 版","for":"產品策略、0→1、數據驗證"}]`。
-   只有一種就寫一筆。之後 `/nextrole:resume` 會照 JD 訊號挑版本。
-2. WRITE **1b 硬門檻條件**（`hard_blockers`）
-   先解釋這是什麼：**不是「我比較弱」，是「一條就直接被刷掉」的條件** — 例如必備英文流利、必備 N 年某職務年資、必備特定產業實戰。
-   問：「以你目前的條件，看到哪些要求你會知道自己一定不會過？」
-   寫成字串陣列。空的也可以，之後評分時發現了再補。
-3. WRITE **1c 投遞門檻**（`fit_threshold`，預設 7）
-   說明：適合度評分滿分 13，框架的建議是 7 分以上值得投，但每個人的實際命中率不同。
-   先用預設值，等累積夠多投遞結果後 `/nextrole:board` 會自動回報建議值。這題通常直接用預設。
-4. WRITE **1d 求職信字數上限**（`cover_letter_max_chars`，預設 300）
-5. WRITE **1e Google 帳號與試算表**（`google_email`、`spreadsheet_id`）
-   只有要把面試題同步到 Google 試算表時才需要。問：「要把面試準備同步到 Google 試算表嗎？」
-   - 要，而且已經有一份 → 請他貼試算表網址，從 `/spreadsheets/d/<ID>/` 取出 ID。
-   - 要，但還沒有 → 用 `mcp__google_workspace__create_spreadsheet` 建一份，標題讓他決定，建好後把 ID 寫進 config，並把連結給他。
-   - 不用 → 兩欄留 `null`，`/nextrole:interview` 就只寫本機檔案。
-   ⚠️ Google 工具回報需要授權時，把授權連結**原樣**貼給他點，不要自己想辦法繞過。
+2. WRITE 回報建了什麼，然後**直接給下一步**，不要再問設定：
 
-## Phase 2 -- 寫入與回報
-
-1. THINK 確認每一題都已收到回答或明確跳過。還有沒問到的就停在這裡。
-2. WRITE 用 `python3` 直接改 `~/.nextrole/config.json` 即可，不用另寫腳本。
-3. WRITE 回報：哪些設好了、哪些留空、下一步可以做什麼。
-
-   > 設定好了。接下來：
+   > 建好了。接下來：
    > - `/nextrole:search` 做問卷並開始找職缺
-   > - `/nextrole:board` 看職缺看板
-   > - `/nextrole:interview` 建面試素材（故事庫、事實庫、口徑）
+   > - `/nextrole:board` 看職缺看板（搜尋完才有東西）
+   >
+   > 履歷版本、硬門檻、Google 試算表這些設定不用現在決定，
+   > 用到的時候對應的 skill 會問你。
 
-## Phase 3 -- 之後改設定（回訪）
+## Phase 1 -- 看設定 / 改設定（使用者主動要求時）
 
-1. READ 讀現有 `config.json`，把目前的值列給使用者看。
-2. WRITE 問他要改哪一項，只改那一項，其餘不動。
+1. READ 讀 `~/.nextrole/config.json`，把目前的值列給使用者看，空的就標「未設定」。
+2. WRITE 問他要改哪一項，**只改那一項**，其餘不動。用 `python3` 直接改即可。
+
+| 欄位 | 意思 |
+|---|---|
+| `resume_versions` | 履歷版本清單，`[{"id","label","for"}]` |
+| `hard_blockers` | 一條不符合就直接被刷掉的條件，字串陣列 |
+| `fit_threshold` | 投遞門檻，滿分 13，預設 7。`calibrate.py` 會依實際結果建議 |
+| `cover_letter_max_chars` | 求職信字數上限，預設 300 |
+| `google_email`／`spreadsheet_id` | 面試題要同步到哪份 Google 試算表 |
+| `sheets_declined` | 使用者說過不要同步試算表，設 `true` 之後就不再問 |
+
+## Phase 2 -- 修復（其他 skill 說路徑壞掉時）
+
+`~/.nextrole/bin` 是指向 plugin `scripts/` 的 symlink，plugin 更新後會指到舊版本目錄。
+重跑 Phase 0 的 `init_store.py` 就會自動更新指向。
 
 ## 檔案位置
 
@@ -77,10 +89,10 @@ description: NextRole 求職工具的第一次設定與後續改設定：建立�
 | `~/.nextrole/kit/` | 事實庫、故事庫、口徑、弱點 — 由 `/nextrole:interview` 填 |
 | `~/.nextrole/board.json` | 職缺主檔 |
 | `~/.nextrole/resumes/` | 主履歷與各職缺的客製版 |
-| `~/.nextrole/output/` | 搜尋結果與看板 |
+| `~/.nextrole/output/` | 搜尋結果與看板三頁 |
 | `~/.nextrole/bin` | → 本 plugin 的 `scripts/` |
 
 ## 已知地雷
 
-- `~/.nextrole/bin` 是 symlink。plugin 更新或搬家後指向會失效 — 重跑 `init_store.py` 會自動更新指向。
 - 這個 plugin 的目錄底下**永遠不該出現使用者的素材**。發現有就是 bug，要移到 `~/.nextrole/`。
+- 不要為了「設定完整」而追問。空欄位是預期狀態。

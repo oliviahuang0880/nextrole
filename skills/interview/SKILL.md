@@ -119,8 +119,18 @@ description: NextRole 的面試題準備：先用對話把使用者的事實庫�
 
 ## 流程 E -- 同步 Google 試算表
 
-只有 `config.json` 有 `spreadsheet_id` 時才做。沒有就只寫本機檔案，並告訴使用者可以跑
-`/nextrole:setup` 設定。
+本機的 `qa.md` 已經寫好了，這一段是額外的同步，可做可不做。
+
+`config.json` 沒有 `spreadsheet_id`、而且 `sheets_declined` 不是 `true` 時，
+**在這裡問**（不要叫他去跑 setup）：
+
+> 「要把這份面試題同步到 Google 試算表嗎？（手機上就看得到，複習比較方便）」
+> - 已經有一份 → 請他貼網址，從 `/spreadsheets/d/<ID>/` 取出 ID 寫進 `config.json`
+> - 還沒有 → 用 `mcp__google_workspace__create_spreadsheet` 建一份，標題讓他決定
+> - 不用 → 就到這裡結束，本機檔案已經夠用。把 `config.json` 的
+>   `sheets_declined` 設成 `true`，**之後不要再問第二次**
+
+他手上剛好有一份剛產出的面試題，這時候才判斷得出來要不要同步。
 
 1. READ 讀 `rules/試算表格式規範.md`。
 2. WRITE **先把要寫的內容給使用者看，問他可不可以寫。** 這一步不可省。

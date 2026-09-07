@@ -27,6 +27,9 @@ DEFAULT_CONFIG = {
     "version": 1,
     "google_email": None,
     "spreadsheet_id": None,
+    # 使用者明確說過不要同步試算表。用獨立欄位而不是把 spreadsheet_id 塞 false，
+    # 免得「還沒問過」跟「問過了但不要」分不出來。
+    "sheets_declined": False,
     "fit_threshold": 7,
     "hard_blockers": [],
     "resume_versions": [],
