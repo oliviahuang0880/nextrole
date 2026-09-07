@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""把 board.json 畫成三頁：職缺收件匣 / 適合度分析 / 投遞追蹤。
+"""把 board.json 畫成三頁：職缺收件匣 / 契合度診斷 / 投遞追蹤。
 
 每一頁只回答一個問題，流動方向是單向的（見 design.md）。
 
@@ -131,9 +131,11 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
 
     table = (
         "<div class='tw'><table id='t'><colgroup>"
-        "<col style='width:36px'><col style='width:66px'><col style='width:300px'>"
-        "<col style='width:126px'><col style='width:78px'><col style='width:52px'>"
-        "<col style='width:106px'><col><col style='width:90px'>"
+        # 欄寬依實測需求配置：只有「命中詞」不設寬度，吃剩餘空間。
+        # 量測方式見 design.md；改 --gut 要把每個固定寬度同步加減 2×gut。
+        "<col style='width:36px'><col style='width:56px'><col style='width:240px'>"
+        "<col style='width:112px'><col style='width:80px'><col style='width:52px'>"
+        "<col style='width:110px'><col><col style='width:90px'>"
         "</colgroup><thead><tr>"
         "<th class='nosort'></th>"
         "<th data-k='score' data-num='1' class='rt'>評分<span class='ind'></span></th>"
@@ -219,7 +221,7 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
     return _write(path, doc)
 
 
-# ── ② 適合度分析 ────────────────────────────────────────────
+# ── ② 契合度診斷 ────────────────────────────────────────────
 IND = [("industry", "產業關係", 4), ("overlap", "職務重疊", 4), ("condition", "條件符合", 5)]
 
 
@@ -301,7 +303,7 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
         "<p>只有你儲存的職缺會出現在這裡。契合度診斷要讀完整 JD，"
         f"所以是你指定才跑。目前的投遞門檻是 {threshold} 分（滿分 13）。</p></div>"
         "<div class='metrics'>"
-        + metric("待分析", str(len(saved)), "已儲存、還沒投遞")
+        + metric("本頁職缺", str(len(saved)), "已儲存、還沒投遞")
         + metric("已診斷", str(len(rated)), f"還有 {len(saved)-len(rated)} 筆沒做")
         + metric("建議投遞", str(len(go)), f"總分 ≥ {threshold+1}")
         + metric("踩到硬門檻", str(sum(1 for r in rated if r['fit'].get('hard_blocker'))),
@@ -420,7 +422,7 @@ def render_tracker(b: dict, cfg: dict, path: str) -> str:
         "</tr></thead><tbody>" + "\n".join(body) + "</tbody></table></div>"
     ) if tracked else empty(
         "還沒有投遞紀錄",
-        "去<a href='analysis.html'>適合度分析</a>把決定要投的按「開始投遞」，它們就會出現在這裡。")
+        "去<a href='analysis.html'>契合度診斷</a>把決定要投的按「開始投遞」，它們就會出現在這裡。")
 
     content = (
         "<div class='head'><div class='kicker'>第三步 · 追蹤</div>"

@@ -156,24 +156,35 @@ def next_turn(answered: dict | None = None) -> dict:
     return {"type": "result", "classifications": _sanitize(ans)}
 
 
-def _sanitize(cls: dict) -> dict:
+def _sanitize(cls: dict, *, fill_missing: bool = True) -> dict:
+    """只留合法的分類。
+
+    fill_missing=True：缺漏的補 cold（保守），給「已答完全部 35 題」的路徑用。
+    fill_missing=False：缺漏的就是缺漏，代表「未表態」——使用者整組跳過時走這條。
+    ⚠️ 未表態不等於 cold。cold 會變成 penalty 30 的負向詞，其中五項還會
+    `exclude_if_title`（資料管理與計算／預算／影像創作／表演／創意寫作），
+    等於使用者只是沒作答，卻讓職稱含這些詞的職缺被整筆剔除。
+    """
     out = {}
     for k, v in (cls or {}).items():
         if k in SKILL_BY_KEY and v in VALID_CATS:
             out[k] = v
-    for s in SKILLS:  # 缺漏的補 cold（保守）
-        out.setdefault(s["key"], "cold")
+    if fill_missing:
+        for s in SKILLS:
+            out.setdefault(s["key"], "cold")
     return out
 
 
 # ───────────────────────── 產出 profile ─────────────────────────
 def build_profile(classifications: dict, *, base: dict | None = None, notes: dict | None = None) -> dict:
     """把分類結果轉成 keywords.json（可直接給 score.py）。notes：各組的自由補充，存進 _meta。"""
-    cls = _sanitize(classifications)
+    cls = _sanitize(classifications, fill_missing=False)
     positive, negative, q_count = [], list(BASE_NEGATIVE), 0
     total_w = 0
     for s in SKILLS:
-        c = cls[s["key"]]
+        c = cls.get(s["key"])
+        if c is None:      # 未表態（整組跳過）：不加分也不扣分
+            continue
         if c == "on_fire" or c == "heating":
             w = 3 if c == "on_fire" else 2
             q = bool(s["search"]) and q_count < 10  # 限制搜尋詞數，避免噪音
@@ -194,9 +205,15 @@ def build_profile(classifications: dict, *, base: dict | None = None, notes: dic
     method2_full = max(10, round(0.4 * total_w))
 
     clean_notes = {k: v for k, v in (notes or {}).items() if isinstance(v, str) and v.strip()}
+    # Phase 4 的答案不屬於技能問卷，重做問卷時一律沿用舊值，不得清掉
+    base = base or {}
+    base_scoring = base.get("scoring", {})
+    filters = dict(base.get("filters") or {"allowed_cities": ["台北", "新北"]})
+    filters.setdefault("allow_remote", True)
+
     return {
         "_meta": {"source": "method2_questionnaire", "notes": clean_notes},
-        "candidate_titles": [],
+        "candidate_titles": list(base.get("candidate_titles", [])),
         "method2_positive": positive,
         "method1_positive": method1,
         "field_terms": list((base or {}).get("field_terms", [])),
@@ -208,9 +225,9 @@ def build_profile(classifications: dict, *, base: dict | None = None, notes: dic
             "method1_full": 12,
             "threshold": 60,
             "title_boost": 2.0,
-            "use_field_terms": False,
+            "use_field_terms": bool(base_scoring.get("use_field_terms", False)),
         },
-        "filters": {"allowed_cities": ["台北", "新北"], "allow_remote": True},
+        "filters": filters,
     }
 
 

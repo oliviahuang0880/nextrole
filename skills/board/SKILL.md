@@ -13,10 +13,10 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
 |---|---|---|---|
 | ① 職缺收件匣 | `inbox.html` | 這批搜尋結果哪些值得留下？ | 還沒投遞的全部 |
 | ② 契合度診斷 | `analysis.html` | 留下的這幾個，到底投不投？ | `saved=true` 且還沒投 |
+| ③ 投遞追蹤 | `tracker.html` | 投出去的現在到哪了？ | `status` 不是 `null` |
 
 收起來的東西沒有不見：收件匣的「已看過」彈窗列 `seen` 的，診斷頁的「已移出」彈窗列
 `ever_saved` 但已經 `saved=false` 的，都能放回去。
-| ③ 投遞追蹤 | `tracker.html` | 投出去的現在到哪了？ | `status` 不是 `null` |
 
 資料欄位：`seen`（看過，收件匣預設不再顯示）、`saved`（儲存，進第二頁）、
 `status`（`null` ＝還沒投；投了之後是 `applied`／`first`／`second`／`third`／`offer`／`thanks`／`ghosted`，
@@ -26,7 +26,7 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
 
 - 只寫 `~/.nextrole/board.json`（經 `board.py`，會自動備份）。不得手改 JSON 的結構。
 - **爬蟲不得覆寫使用者的判斷**：`status`／`notes`／`fit`／`artifacts` 只能由使用者或本 skill 改。
-- 適合度評分**只評使用者指定的職缺**，不主動全跑 — 每一筆都要讀完整 JD，全跑既慢又貴。
+- 契合度診斷**只評使用者指定的職缺**，不主動全跑 — 每一筆都要讀完整 JD，全跑既慢又貴。
 - 評分要有依據。JD 上找不到的東西就標「JD 未提」，**不要猜**。
 
 # SOP
@@ -45,10 +45,10 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
 3. WRITE 回報現況：收件匣幾筆待取捨、分析頁幾筆待評、投遞追蹤幾筆進行中。
    ⭐ 依他現在卡在哪一頁給下一步建議，不要三頁的統計一次全倒給他。
 
-## Phase 1 -- 適合度評分（決定投不投）
+## Phase 1 -- 契合度診斷（決定投不投）
 
-1. THINK 先確認要評哪幾筆。使用者說「評一評」而沒指定時，**問他要評哪些**，或建議「機器分最高的前 N 筆」「還沒評的」。不要自己全跑。
-2. READ 讀取 `rules/適合度評分判準.md` 與 `~/.nextrole/config.json`（拿 `fit_threshold` 與 `hard_blockers`）。
+1. THINK 先確認要評哪幾筆。使用者說「評一評」而沒指定時，**問他要評哪些**，或建議「評分最高的前 N 筆」「還沒評的」。不要自己全跑。
+2. READ 讀取 `rules/契合度診斷判準.md` 與 `~/.nextrole/config.json`（拿 `fit_threshold` 與 `hard_blockers`）。
    `hard_blockers` 空的很正常，**不要為了填滿它而先問使用者** —— 硬門檻是看了真實 JD 才浮現的東西。
 3. READ 從 `board.json` 取出這幾筆的完整 `job.description`。JD 太短（<250 字）就標明「JD 資訊不足，評分信心低」。
 4. WRITE 逐筆輸出評分表給使用者看：三個指標各幾分＋為什麼、硬門檻有沒有踩到、總分與建議。
@@ -79,7 +79,7 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
    - `status`（投遞後的狀態，設了會自動補 seen／saved 與 `applied_at`）
    - `applied_at`（`YYYY-MM-DD`）
    - `notes`
-   分數與契合度不能從這裡改 — 適合度只能走 Phase 1。
+   分數與契合度不能從這裡改 — 契合度只能走 Phase 1。
 
 ## Phase 3 -- 校準投遞門檻
 
@@ -100,5 +100,6 @@ description: NextRole 職缺看板（三頁）：① 職缺收件匣做取捨、
 
 - `cd ~/.nextrole/bin` 失敗時（通常是 plugin 更新過，symlink 指向舊版本），跑一次 `/nextrole:setup` 就會重新指好。
 - 看板頁面是靜態檔，靠 `serve.py` 的 `PATCH /api/job/<id>` 寫回。**沒起 server 就改東西**只會存在瀏覽器的 localStorage，頁面會跳黃色提示 — 照提示把暫存內容貼回來補寫。
-- `PATCH` 只收 `status` 與 `notes`。適合度與分數不能從頁面改，只能走 Phase 1。
+- `PATCH` 只收 `status`／`notes`／`seen`／`saved`／`applied_at` 這五個欄位（`board.PATCHABLE`）。
+  評分與契合度不能從頁面改，只能走 Phase 1。
 - 重跑搜尋會更新分數，**但不會動使用者的判斷**。分數變了而狀態沒變是正常的。

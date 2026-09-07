@@ -51,11 +51,11 @@ def main():
 
     print(f"目前門檻：{current} 分")
     if len(rows) < args.min_sample:
-        print(f"樣本只有 {len(rows)} 筆（已投遞且已評適合度），還不夠校準。")
-        print(f"至少要 {args.min_sample} 筆才有參考價值 — 再投幾家，或把投過的舊職缺補評適合度。")
+        print(f"樣本只有 {len(rows)} 筆（已投遞且已做契合度診斷），還不夠校準。")
+        print(f"至少要 {args.min_sample} 筆才有參考價值 — 再投幾家，或把投過的舊職缺補做契合度診斷。")
         return
 
-    print(f"樣本 {len(rows)} 筆（已投遞且已評適合度）\n")
+    print(f"樣本 {len(rows)} 筆（已投遞且已做契合度診斷）\n")
     print("  分數  投遞  有回應  回應率")
     by_score: dict[int, list[dict]] = {}
     for r in rows:

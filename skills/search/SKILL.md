@@ -13,7 +13,7 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 
 - 唯一持久產物是 `~/.nextrole/profile.json`（覆寫前 `profile_io.py` 會自動備份一份 `profile.<UTC ts>.json`）。
 - 搜尋產出放 `~/.nextrole/output/`：`results_<ts>.html` + `.csv`、重算用的 `_jobs_cache.json`，以及看板 `board.html`。
-- 搜尋收尾會把結果併進 `~/.nextrole/board.json`。**併入只更新分數與 last_seen，使用者在看板上設的狀態／備註／適合度一律保留** — 不得覆寫。
+- 搜尋收尾會把結果併進 `~/.nextrole/board.json`。**併入只更新分數與 last_seen，使用者在看板上設的狀態／備註／契合度一律保留** — 不得覆寫。
 - `profile.json` 只放長期偏好：關鍵字、權重、`filters`、`negative`、`scoring`。**不得**寫入單次執行才用的東西（`extra_queries` 只當次有效）。
 - 所有資料留在使用者本機，不上傳。不需要也不得要求 `ANTHROPIC_API_KEY`。
 - 對話輸出有兩個固定格式：關鍵字清單用 `templates/keywords-report.md`，搜尋回報用 `templates/search-summary.md`。兩者都不得殘留 `{{...}}` 填位符號。

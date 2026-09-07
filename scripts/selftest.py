@@ -141,15 +141,19 @@ def main():
     bd.set_fit(jid, {"industry": 2, "overlap": 4, "condition": 4, "hard_blocker": False})
     rec = bd.load()["jobs"][jid]
     check(rec["fit"]["total"] == 10 and rec["fit"]["verdict"] == "投",
-          f"適合度 10／13 判定為投（{rec['fit']['verdict']}）")
+          f"契合度 10／13 判定為投（{rec['fit']['verdict']}）")
 
     bd.patch(jid, {"status": "applied", "notes": "8/30 投遞"})
     rec = bd.load()["jobs"][jid]
     check(bd.stage_of(rec) == "tracker", "按『開始投遞』後進到投遞追蹤")
     check(rec["applied_at"] is not None, "投遞時自動記下時間")
     c = bd.counts()
-    check(c["inbox"] == 2 and c["saved"] == 0 and c["tracker"] == 1,
+    # 三筆：一筆已投遞（追蹤）、一筆按過 ✓ 收起來、剩一筆真的還要處理。
+    # 收件匣的數字要跟頁面上看得到的筆數一致，按過 ✓ 的不能再算進去。
+    check(c["inbox"] == 1 and c["saved"] == 0 and c["tracker"] == 1,
           f"三頁計數正確（收件匣 {c['inbox']}／分析 {c['saved']}／追蹤 {c['tracker']}）")
+    check(c["_dismissed"] == 1,
+          f"按 ✓ 收起來的另外計數，不混進收件匣（_dismissed={c['_dismissed']}）")
 
     print("\n[5] ⭐ 重跑搜尋不得洗掉使用者的判斷")
     before = bd.load()["jobs"][jid]
@@ -166,7 +170,7 @@ def main():
     check(rec["fit"]["total"] == 10, "fit 保住了")
     check(rec["applied_at"] is not None, "applied_at 保住了")
 
-    print("\n[6] 白名單：頁面不能改分數或適合度")
+    print("\n[6] 白名單：頁面不能改分數或契合度")
     for bad in ({"eval": {"score": 100}}, {"fit": {"total": 13}}, {"status": "不存在"},
                 {"first_seen": "2020-01-01"}):
         try:
@@ -182,7 +186,7 @@ def main():
     for name, doc in docs.items():
         check("{{" not in doc, f"{name} 沒有殘留 {{{{ 填位符號")
     check("8/30 投遞" in docs["tracker.html"], "備註畫在投遞追蹤頁")
-    check("10" in docs["tracker.html"], "適合度畫在投遞追蹤頁")
+    check("10" in docs["tracker.html"], "契合度畫在投遞追蹤頁")
     check("act-save" in docs["inbox.html"], "收件匣有儲存按鈕")
     check(">評分<" in docs["inbox.html"], "收件匣的欄位叫『評分』")
     check("seenDlg" in docs["inbox.html"], "收件匣有『已看過』彈窗")

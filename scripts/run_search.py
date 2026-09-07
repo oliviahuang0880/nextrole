@@ -422,7 +422,13 @@ def main():
         print("健檢代碼：NO_QUERIES")
         raise SystemExit("沒有搜尋詞可用 — 請先跑完技能問卷，或手動標幾個技能為搜尋詞。")
 
-    if args.from_cache and os.path.exists(JOBS_CACHE):
+    if args.from_cache and not os.path.exists(JOBS_CACHE):
+        raise SystemExit(
+            f"--from-cache 但找不到快取：{JOBS_CACHE}\n"
+            "先跑一次不帶 --from-cache 的搜尋建立快取，再用 --from-cache 重算。"
+        )
+
+    if args.from_cache:
         with open(JOBS_CACHE, encoding="utf-8") as f:
             jobs = json.load(f)
         n_before = len(jobs)
@@ -481,7 +487,7 @@ def main():
     print(f"\n完成！共 {len(scored)} 筆（推薦 {rec} 筆）")
     print(f"  網頁：{html_path}")
     print(f"  CSV ：{csv_path}")
-    # 併進職缺看板：只更新分數與 last_seen，使用者的狀態／備註／適合度一律保留
+    # 併進職缺看板：只更新分數與 last_seen，使用者的狀態／備註／契合度一律保留
     stats = _board.merge(scored)
     _render_board.render_all(_board.load(), _store.load_config())
     print(f"  看板：新增 {stats['added']} 筆、更新 {stats['updated']} 筆，目前共 {stats['total']} 筆")

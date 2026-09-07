@@ -221,7 +221,7 @@ def patch(jid: str, fields: dict, board: dict | None = None) -> dict:
 
 @_atomic
 def set_fit(jid: str, fit: dict, board: dict | None = None) -> dict:
-    """寫入適合度評分。三指標 + 硬門檻，total 與 verdict 由這裡算，不信外面給的。"""
+    """寫入契合度診斷。三指標 + 硬門檻，total 與 verdict 由這裡算，不信外面給的。"""
     b = board if board is not None else load()
     rec = b["jobs"].get(jid)
     if rec is None:
@@ -274,18 +274,25 @@ def counts(board: dict | None = None) -> dict:
     b = board if board is not None else load()
     out = {s: 0 for s in STATUSES}
     out.update({st: 0 for st in STAGES})
-    rated = seen = 0
+    rated = seen = dismiss = 0
     for rec in b["jobs"].values():
-        out[stage_of(rec)] += 1
+        st = stage_of(rec)
+        out[st] += 1
         if rec.get("status"):
             out[rec["status"]] += 1
         if rec.get("fit", {}).get("total") is not None:
             rated += 1
         if rec.get("seen"):
             seen += 1
+            # 按過 ✓ 的已經從收件匣收起來了，不該再算成「待處理」——
+            # 導覽列的數字要跟頁面上看得到的筆數一致。
+            if st == "inbox":
+                dismiss += 1
+    out["inbox"] -= dismiss
     out["_total"] = len(b["jobs"])
     out["_rated"] = rated
     out["_seen"] = seen
+    out["_dismissed"] = dismiss
     return out
 
 

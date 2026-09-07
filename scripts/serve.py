@@ -61,6 +61,11 @@ class Handler(SimpleHTTPRequestHandler):
             if not isinstance(fields, dict):
                 raise ValueError("body 必須是物件")
             rec = bd.patch(jid, fields)
+            # 寫進 log 的不只是 job id，還有改了哪些欄位、改成什麼。
+            # 只記 id 的話，事後發現某筆狀態不對，除了翻 board.json 的備份
+            # 逐份 diff 之外沒有別的辦法還原是誰改的。
+            self.log_message('PATCH %s %s', jid,
+                             ' '.join(f'{k}={v!r}' for k, v in sorted(fields.items())))
             # 改動會影響其他兩頁的計數與內容，直接全部重畫
             render_board.render_all(bd.load(), store.load_config())
         except KeyError:
@@ -74,7 +79,7 @@ class Handler(SimpleHTTPRequestHandler):
     def log_message(self, fmt, *args):
         # log_error 會傳 HTTPStatus 進來，不能直接當字串用
         first = str(args[0]) if args else ""
-        if "/api/" in first or "error" in fmt.lower():
+        if fmt.startswith("PATCH ") or "/api/" in first or "error" in fmt.lower():
             super().log_message(fmt, *args)
 
 
