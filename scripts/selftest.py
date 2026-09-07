@@ -262,6 +262,38 @@ def main():
     check(len(bd.dismissed(bd.load())) == 1, "按 ✓ 收起來的查得到")
     check(bd.stage_of(bd.load()["jobs"]["y"]) == "dismissed", "按 ✓ 的也不算在收件匣裡")
 
+    print("\n[7e] 履歷可以丟任何格式，我們自己轉 Markdown")
+    import import_resume as ir
+    html = ("<html><head><style>a{}</style><script>x=1</script></head><body>"
+            "<h1>某某某</h1><p>產品企劃</p><ul><li>做過 A</li><li>做過 B</li></ul>"
+            "<p>技能：需求訪談、規格撰寫、跨部門溝通、指標定義、資料查詢</p></body></html>")
+    hp = os.path.join(_TMP, "r.html")
+    with open(hp, "w", encoding="utf-8") as f:
+        f.write(html)
+    got = ir.tidy(ir.extract(hp))
+    check("某某某" in got and "做過 A" in got, "HTML 轉得出內容")
+    check("<script" not in got and "x=1" not in got and "<h1>" not in got,
+          "HTML 的標籤與 script 都清掉了")
+    tp = os.path.join(_TMP, "r.txt")
+    with open(tp, "w", encoding="utf-8") as f:
+        f.write("純文字履歷\n\n\n\n經歷：某公司\n")
+    check(ir.tidy(ir.extract(tp)).count("\n\n\n") == 0, "多餘空行收乾淨")
+    for ext, why in (("doc", "舊版 Word"), ("png", "OCR")):
+        bp = os.path.join(_TMP, f"r.{ext}")
+        open(bp, "w").write("x")
+        try:
+            ir.extract(bp)
+            check(False, f".{ext} 應該要擋下來")
+        except SystemExit as exc:
+            check(why in str(exc), f".{ext} 擋下來而且說得出替代做法")
+    bp = os.path.join(_TMP, "r.zzz")
+    open(bp, "w").write("x")
+    try:
+        ir.extract(bp)
+        check(False, "沒見過的副檔名應該要擋下來")
+    except SystemExit as exc:
+        check("貼給我" in str(exc), "沒見過的副檔名也給得出出路")
+
     print("\n[8] 零個人資料：暫存 HOME 以外什麼都沒寫")
     check(store.ROOT.startswith(_TMP), f"所有寫入都在暫存區（{store.ROOT}）")
 
