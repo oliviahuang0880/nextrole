@@ -27,7 +27,7 @@ description: NextRole 的模擬面試：照固定配比出 15 到 18 題、一�
 2. READ 讀 `~/.nextrole/interviews/<job_id>/qa.md`、`~/.nextrole/kit/`
    （事實庫、故事庫、口徑、**弱點清單**）。
 3. THINK ⚠️ **這家還沒有 `qa.md` 時**（他想臨時練一家還沒準備的公司）：
-   先問有沒有 JD／官網，**至少跑一次 `/nextrole:interview` 流程 B 的第 2 和第 4 步**
+   先問有沒有 JD／官網，**至少跑一次 `/nextrole:interview`「準備一家公司」的第 2 和第 4 步**
    （研究產品在解什麼問題、找出這份 JD 的異常之處），否則只問得出通用題，模擬價值折半。
    時間不夠就明講：「這場只練通用題，客製題等資料做出來再練。」
 
