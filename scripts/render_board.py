@@ -134,7 +134,7 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
         "<div class='tw'><table id='t'><colgroup>"
         # 欄寬依實測需求配置：只有「命中詞」不設寬度，吃剩餘空間。
         # 量測方式見 design.md；改 --gut 要把每個固定寬度同步加減 2×gut。
-        "<col style='width:36px'><col style='width:56px'><col style='width:240px'>"
+        "<col style='width:36px'><col style='width:64px'><col style='width:240px'>"
         "<col style='width:112px'><col style='width:80px'><col style='width:52px'>"
         "<col style='width:110px'><col><col style='width:90px'>"
         "</colgroup><thead><tr>"

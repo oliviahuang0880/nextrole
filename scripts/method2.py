@@ -201,7 +201,6 @@ def build_profile(classifications: dict, *, base: dict | None = None, notes: dic
             negative.append(entry)
 
     method1 = list((base or {}).get("method1_positive", []))  # 方法一（階段三）；現在通常為空
-    has_m1 = bool(method1)
     method2_full = max(10, round(0.4 * total_w))
 
     clean_notes = {k: v for k, v in (notes or {}).items() if isinstance(v, str) and v.strip()}
@@ -219,8 +218,8 @@ def build_profile(classifications: dict, *, base: dict | None = None, notes: dic
         "field_terms": list((base or {}).get("field_terms", [])),
         "negative": negative,
         "scoring": {
-            "blend_method2": 1.0 if not has_m1 else 0.6,
-            "blend_method1": 0.0 if not has_m1 else 0.4,
+            # 天賦是加分不是權重的一半，理由見 score.py 的說明
+            "talent_bonus_cap": 15,
             "method2_full": method2_full,
             "method1_full": 12,
             "threshold": 60,

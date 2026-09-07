@@ -164,6 +164,10 @@ tr.row.dim a{color:#8fa8c4}
 /* 數字欄一律靠右，位數才對得齊 */
 td.num,th.rt{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
 td.num .badge{min-width:38px;justify-content:center}
+/* 內容是徽章或按鈕的欄不做截字：元素本身就比文字寬，只要欄寬不夠，
+   ellipsis 就會在徽章旁邊多畫一個「…」出來。欄寬也要留得下
+   badge(38) + 左右 gutter(2×--gut)。 */
+td.num,td.acts,td.ctr{text-overflow:clip}
 td.ttl a{display:block;overflow:hidden;text-overflow:ellipsis;color:var(--ink);
   font-weight:600;font-size:13px}
 td.ttl a:hover{color:var(--navy-cobalt)}

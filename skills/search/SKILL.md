@@ -55,12 +55,21 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 1. READ 讀取 `examples/invitation_template.md`，把邀請文字唸給使用者，請他複製傳給 5–6 位**認識他的人**，並提醒「不急，可以慢慢等回覆，回來貼給我就行」。
 2. READ 接收使用者貼回的朋友回覆（一則一則或一次全貼都行），每收到一則簡短確認「收到 N 則了」。
 3. THINK 收到 ≥ 3 則且使用者說「彙整」，或 ≥ 5 則時主動詢問「夠了要彙整嗎？」，再由**你自己**把所有回覆濃縮成 6–10 個最常被提到的共通天賦（繁體中文短詞，不要句子／公司名／人名／地名）。不得呼叫任何外部 AI API。
-4. WRITE 把彙整結果寫成 `/tmp/talents.json`（JSON 陣列，不要 code fence）：
+4. WRITE 把彙整結果寫成 `/tmp/talents.json`（JSON 陣列，不要 code fence）。
+   ⭐ **每一個天賦都要帶 `syn`：2–3 個 JD 真的會這樣寫的說法。**
 
    ```json
-   [{"term":"傾聽溝通","en":"communication","weight":2},
-    {"term":"分析判斷","en":"analysis","weight":2}]
+   [{"term":"傾聽溝通","en":"communication","weight":2,
+     "syn":["溝通協調","跨部門溝通","stakeholder communication"]},
+    {"term":"分析判斷","en":"analysis","weight":2,
+     "syn":["數據分析","問題分析","data analysis"]}]
    ```
+
+   為什麼一定要有 `syn`：朋友寫的是「面對不確定性」「好奇追問」，JD 寫的是
+   「抗壓性」「主動探究」；朋友寫「跨部門溝通」，JD 寫「跨部門協作」。
+   中文比對走子字串，**差一個字就是 0 分**。實測沒有 `syn` 時，七個天賦詞裡
+   只有一個曾經命中過任何一份 JD —— 等於整份天賦問卷對評分沒有作用。
+   `term` 保留朋友的原話（那是給履歷和面試用的），`syn` 負責讓它在 JD 裡找得到。
 
 5. WRITE 跑 `cd ~/.nextrole/bin && uv run merge_talents.py /tmp/talents.json`，列出彙整出的天賦給使用者看，接著進 Phase 3。
 

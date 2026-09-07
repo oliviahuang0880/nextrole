@@ -1,11 +1,17 @@
 """職缺評分引擎（雙面向）：讀 profile/keywords.json，對每筆職缺算 0–100 分。
 
-總分 = 100 × (方法二權重 × 方法二契合度 + 方法一權重 × 方法一契合度) − 負向懲罰
+總分 = 100 × 方法二契合度 + 天賦加分 − 負向懲罰
 
-- 方法二契合度 = 命中 method2_positive 關鍵字的加權分 / method2_full，上限 1。
+- 方法二契合度 = 命中 method2_positive 關鍵字的加權分 / method2_full。
   命中出現在「職稱」者再乘 title_boost。
-- 方法一契合度 = 命中 method1_positive（6 人共通天賦）的加權分 / method1_full，上限 1。
-- 兩面向都要高度命中才拿高分 → 100 分稀有。
+- 天賦加分 = 命中 method1_positive（朋友彙整的天賦）的加權分，封頂 talent_bonus_cap。
+
+⭐ **天賦只加分，不當分母。** 這兩組詞來自不同語言：方法二的詞（研究、分析、專案管理）
+本來就是 JD 的用語；方法一的詞是朋友形容你的話（「面對不確定性」「好奇追問」），
+JD 幾乎不會這樣寫。實測七個天賦詞裡只有一個命中過任何一份 JD。
+把命中率差一個量級的兩組詞放進同一個線性加權，低的那邊就變成拖油瓶 ——
+做過天賦問卷的人分數反而比沒做的低，等於用了功能被懲罰。所以改成單向加分。
+（六組技能全跳過、完全沒有技能關鍵字時例外：那時天賦詞就是唯一的主軸。）
 - 負向：命中 penalty 扣分；命中含 exclude 的詞 → 整筆剔除（score=0）。
 - 達 threshold 者標記為「推薦」。
 """
@@ -25,9 +31,18 @@ def load_config(path: str = DEFAULT_KEYWORDS) -> dict:
 
 
 def _terms(entry: dict) -> list[str]:
+    """term／en／syn 都算命中。
+
+    syn 是 JD 慣用語：朋友寫「跨部門溝通」，JD 寫的是「跨部門協作」「cross-functional」。
+    中文比對走子字串，差一個字就是 0 分，所以天賦詞一定要帶同義詞才命中得到。
+    """
     out = []
     for key in ("term", "en"):
         v = (entry.get(key) or "").strip()
+        if v:
+            out.append(v.lower())
+    for v in entry.get("syn") or []:
+        v = (v or "").strip()
         if v:
             out.append(v.lower())
     return out
@@ -68,8 +83,7 @@ def score_job(job: dict, config: dict) -> dict:
     s = config.get("scoring", {})
     title_boost = s.get("title_boost", 2.0)
     threshold = s.get("threshold", 60)
-    w2 = s.get("blend_method2", 0.6)
-    w1 = s.get("blend_method1", 0.4)
+    bonus_cap = s.get("talent_bonus_cap", 15)
     m2_full = s.get("method2_full", 24) or 24
     m1_full = s.get("method1_full", 12) or 12
 
@@ -112,13 +126,20 @@ def score_job(job: dict, config: dict) -> dict:
             else:
                 penalty += entry.get("penalty", 0)
 
-    base = 100 * (w2 * fit2 + w1 * fit1)
+    if m2_entries:
+        bonus = min(bonus_cap, raw1)
+        base = 100 * fit2 + bonus
+    else:
+        # 技能問卷六組全跳過：沒有任何技能關鍵字，天賦詞就是唯一的依據
+        bonus = 0.0
+        base = 100 * fit1
     score = max(0, min(100, round(base - penalty)))
 
     return {
         "score": 0 if excluded else int(score),
         "score_method2": min(100, round(100 * fit2)),
         "score_method1": min(100, round(100 * fit1)),
+        "talent_bonus": round(bonus),
         "penalty": int(penalty),
         "matched_pos": matched2 + matched1,
         "matched_method2": matched2,
