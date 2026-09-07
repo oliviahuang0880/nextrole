@@ -33,7 +33,7 @@ DEFAULT_CONFIG = {
     "fit_threshold": 7,
     "hard_blockers": [],
     "resume_versions": [],
-    "cover_letter_max_chars": 300,
+    "cover_letter_max_chars": 300,   # 目標字數，不是硬上限；見 skills/resume/rules/求職信結構.md
 }
 
 

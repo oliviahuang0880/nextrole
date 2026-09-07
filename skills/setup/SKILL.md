@@ -72,7 +72,7 @@ description: NextRole 求職工具的初始化與設定檢視：建立本機資�
 | `resume_versions` | 履歷版本清單，`[{"id","label","for"}]` |
 | `hard_blockers` | 一條不符合就直接被刷掉的條件，字串陣列 |
 | `fit_threshold` | 投遞門檻，滿分 13，預設 7。`calibrate.py` 會依實際結果建議 |
-| `cover_letter_max_chars` | 求職信字數上限，預設 300 |
+| `cover_letter_max_chars` | 求職信**目標字數**，預設 300。不是硬上限，實際抓 300–350 |
 | `google_email`／`spreadsheet_id` | 面試題要同步到哪份 Google 試算表 |
 | `sheets_declined` | 使用者說過不要同步試算表，設 `true` 之後就不再問 |
 
