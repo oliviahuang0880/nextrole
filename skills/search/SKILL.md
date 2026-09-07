@@ -66,6 +66,7 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 
 1. READ 讀取 `rules/技能問卷對話節奏判準.md` 與 `references/method2_skills.json`，確認 6 組情境、題目節奏、進度條與選項客製化的硬性要求。
 2. WRITE 依已載入規則逐題提問，內部累積 `classifications` 與 `notes`，過程中不把這兩包 dump 給使用者。
+   每組開頭要說「這組跟你想找的工作沒關係就說『跳過』」（見該規則 Rule 7）。
 3. WRITE 問完 35 題後把結果餵進 profile：
 
    ```bash
@@ -79,11 +80,26 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 ## Phase 4 -- 進階偏好
 
 1. READ 讀取 `rules/提問與選項撰寫判準.md` 與 `rules/中立與加權判準.md`，確認提問格式、推薦選項的禁區與三種加權機制的分工。
-2. WRITE 問 **4a 地區**（必填、無預設、可複選）：台灣／亞太／全球／全遠端。含台灣要追問哪些城市。依答案寫入 `filters.regions`（`tw`/`apac`/`global`/`remote`）與 `filters.allowed_cities`；`filters.allow_remote` 維持 `true`。提醒亞太會掃 7 個城市、整跑約 5–8 分鐘。
-3. WRITE 問 **4b 領域偏好**（選填，影響**評分**）。有填 → 由你生 8–15 個該領域的技能／工具／職能詞，列給使用者確認後寫進 `field_terms`（`weight: 3`）並把 `scoring.use_field_terms` 設 `true`。不填 → 維持 `false`，純通用能力評分。**這題不得標推薦選項。**
-4. WRITE 問 **4c 貼有興趣的 JD**（選填，影響**搜尋**）。抽 5–8 個中立技能／領域詞，列給使用者確認後併進本次的 `extra_queries`，不寫進 profile。
-5. WRITE 問 **4d 負向詞**（必問）。先講清楚「職稱命中→整筆剔除／內文命中→扣分」的差別，再給 A–H 選項讓使用者複選或自由填答。依 `rules/中立與加權判準.md` Rule 4 的格式寫入 `negative`；使用者回「沒有」就完全不動。
-6. THINK 確認每一題都已收到使用者回答；有任何一題還沒回答就停在這裡，不得往下走。用 `python3` 直接改 `~/.nextrole/profile.json` 即可，不用另寫腳本。
+2. WRITE 問 **4a 想找的職稱**（必問，直接決定撈得到什麼）。
+
+   ```
+   你想找的職稱是什麼？講幾個你會拿去搜尋的說法就好。
+   例：產品經理、Product Manager、產品企劃
+   ```
+
+   ⭐ **這是唯一會用「職稱」去撈職缺的地方。** 技能問卷產出的是「研究」「分析」這類
+   通用能力詞，用它們去搜 104 會撈回一堆不相干的東西。職稱才撈得到對的職缺。
+   收到之後寫進 `filters` 同層的 `candidate_titles`（字串陣列），`run_search.py` 會把它
+   排在搜尋詞的第一順位。中英文都給更好，兩邊的站命中率不一樣。
+   使用者說「不知道」就照技能問卷的結果建議 2–3 個，**列給他確認過**才寫入。
+
+3. WRITE 問 **4b 地區**（必填、無預設、可複選）：台灣／亞太／全球／全遠端。含台灣要追問哪些城市。依答案寫入 `filters.regions`（`tw`/`apac`/`global`/`remote`）與 `filters.allowed_cities`；`filters.allow_remote` 維持 `true`。提醒亞太會掃 7 個城市、整跑約 5–8 分鐘。
+4. WRITE 問 **4c 領域偏好**（選填，影響**評分**）。有填 → 由你生 8–15 個該領域的技能／工具／職能詞，列給使用者確認後寫進 `field_terms`（`weight: 3`）並把 `scoring.use_field_terms` 設 `true`。不填 → 維持 `false`，純通用能力評分。**這題不得標推薦選項。**
+5. WRITE 問 **4d 貼有興趣的 JD**（選填，影響**搜尋**）。抽 5–8 個中立技能／領域詞，列給使用者確認後併進本次的 `extra_queries`，不寫進 profile。
+6. WRITE 問 **4e 負向詞**（必問）。先講清楚「職稱命中→整筆剔除／內文命中→扣分」的差別，再給 A–H 選項讓使用者複選或自由填答。依 `rules/中立與加權判準.md` Rule 4 的格式寫入 `negative`；使用者回「沒有」就完全不動。
+7. THINK 確認每一題都已收到使用者回答；有任何一題還沒回答就停在這裡，不得往下走。
+   ⚠️ 再確認一次搜尋詞夠不夠：`candidate_titles` ＋ `q:true` 的技能詞加起來
+   少於 3 個就要提醒使用者，否則搜尋會回 `NO_QUERIES` 或 `THIN_RESULT`。用 `python3` 直接改 `~/.nextrole/profile.json` 即可，不用另寫腳本。
 
 ## Phase 5 -- 搜尋與回報
 
