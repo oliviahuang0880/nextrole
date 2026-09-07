@@ -196,7 +196,7 @@ def main():
     # ⚠️ 這裡曾經寫成 check("10" in tracker.html)，而 colgroup 的 108px 剛好含有 "10"，
     # 所以欄位被拿掉之後斷言還是綠的。比對頁面內容一律用夠獨特的字串。
     tr = docs["tracker.html"]
-    check("<th class='nosort'>面試題</th>" in tr, "投遞追蹤有『面試題』欄")
+    check("<th class='nosort rt'>面試準備</th>" in tr, "投遞追蹤有『面試準備』欄，靠右對齊")
     # 導覽列會有「契合度診斷」（那是第二頁的名字），CSS 註解也有，所以只比對表頭
     heads = tr[tr.index("<thead>"):tr.index("</thead>")]
     check("契合度" not in heads,

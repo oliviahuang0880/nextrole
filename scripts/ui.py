@@ -143,7 +143,13 @@ table{border-collapse:collapse;width:100%;font-size:13px;table-layout:fixed;
 /* 不能用 overflow:hidden 做圓角：它會讓 sticky 的 thead 錯位（表頭掉到第一列下面）。
    改成在角落的儲存格自己做圓角。 */
 .tw{border:1px solid var(--border);border-radius:8px;box-shadow:var(--e1);background:var(--surface)}
-.tw table{border-radius:8px}
+.tw table{border-radius:8px;
+  /* table-layout:fixed 下，固定欄寬總和一旦超過容器，唯一沒設寬度的那一欄
+     （收件匣的「命中詞」、追蹤頁的「備註」）會被壓成 0，整欄消失 ——
+     比截字還糟，而且沒有任何提示。給一個下限，視窗太窄就讓頁面橫向捲。
+     ⛔ 不能改成 .tw{overflow-x:auto}：那會建立捲動容器，thead 的 sticky 就失效。
+     下限＝各頁固定欄寬總和 ＋ 彈性欄最少要留的寬度，改欄寬時要一起重算。 */
+  min-width:968px}   /* 收件匣固定欄 784 → 命中詞 184；追蹤頁固定欄 758 → 備註 210 */
 .tw thead th:first-child{border-top-left-radius:8px}
 .tw thead th:last-child{border-top-right-radius:8px}
 .tw tbody tr:last-child td:first-child{border-bottom-left-radius:8px}
@@ -163,11 +169,12 @@ tr.row.dim{color:var(--ink-faint)}
 tr.row.dim a{color:#8fa8c4}
 /* 數字欄一律靠右，位數才對得齊 */
 td.num,th.rt{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+td.rt{text-align:right}
 td.num .badge{min-width:38px;justify-content:center}
 /* 內容是徽章或按鈕的欄不做截字：元素本身就比文字寬，只要欄寬不夠，
    ellipsis 就會在徽章旁邊多畫一個「…」出來。欄寬也要留得下
    badge(38) + 左右 gutter(2×--gut)。 */
-td.num,td.acts,td.ctr{text-overflow:clip}
+td.num,td.acts,td.ctr,td.rt{text-overflow:clip}
 /* 投遞追蹤的「面試題」欄：連到那家公司的試算表頁籤 */
 a.sheet{color:var(--navy-cobalt);font-weight:600;font-size:12px;text-decoration:none}
 a.sheet:hover{text-decoration:underline}
