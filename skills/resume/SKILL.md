@@ -20,13 +20,39 @@ description: 針對單一職缺客製履歷與求職信（104 投遞訊息）。
 
 ## Phase 0 -- 收齊材料
 
-1. READ 確認 `~/.nextrole/kit/facts.md` 與 `~/.nextrole/resumes/` 底下有主履歷。
-   - 沒有主履歷 → 請使用者貼上或指路徑，存成 `~/.nextrole/resumes/master-<id>.md`。
+1. READ 確認 `~/.nextrole/resumes/` 底下有主履歷（`master-*.md`）。
+   - **沒有主履歷** → 現在問，什麼格式都收，用 `import_resume.py` 轉：
+
+     ```bash
+     cd ~/.nextrole/bin && uv run import_resume.py <路徑> --id pm --label "PM 版"
+     # 貼上的純文字改用 --stdin
+     ```
+
+     ⛔ 不要叫他自己先轉檔，那是最容易流失人的地方。轉完把內容給他看過再往下走。
    - `facts.md` 是空的但**主履歷有內容** → 直接開工，主履歷本身就是素材。
      `facts.md` 是補充（數字口徑、履歷放不下的細節），不是前提，不要為了它擋住流程。
-   - 主履歷和 `facts.md` **兩邊都空** → 請他貼經歷，或先跑 `/nextrole:interview` 建素材。
-2. READ 拿 JD。從看板來就讀 `board.json` 的 `job.description`；使用者直接貼就用貼的，
-   並問要不要把這筆加進看板。
+   - 主履歷和 `facts.md` **兩邊都空、他也拿不出履歷** → 請他貼經歷，
+     或先跑 `/nextrole:interview` 的「素材建檔」。
+
+2. READ 拿 JD。**兩條路，後面的流程要一模一樣**：
+
+   **(a) 從看板來** — 讀 `board.json` 的 `job.description`，`job_id` 就是它的 id。
+
+   **(b) 使用者直接貼一份 JD** — 先問公司名與職缺名稱（**不要自己從 JD 猜**），
+   有原始網址也一起要，然後加進看板：
+
+   ```bash
+   cd ~/.nextrole/bin && uv run add_job.py \
+     --company <公司> --title <職缺> --url <網址，沒有就省略> --file <JD 檔>
+   ```
+
+   ⭐ **有網址就一定要帶 `--url`。** `job_id` 是網址的 sha1，帶了網址這筆就會跟
+   爬蟲撈到的同一個職缺合而為一；不帶的話之後會多出一筆重複的。
+
+   ⭐ **加進看板之後，先做契合度診斷，再客製履歷。** 交棒給 `/nextrole:board` 的
+   Phase 1，拿到分數與判定再回來。理由：客製一份履歷要花掉不少來回，
+   先花兩分鐘確認值不值得投，比做完才發現踩到硬門檻划算。
+   診斷判「不投」他還是要做的話，照做 —— 那是他的決定 —— 但要讓他知道分數是幾分。
 3. READ 讀 `~/.nextrole/kit/voice.md`（口徑與地雷）。**每次產出前都要讀** — 這份擋的是
    職稱講錯、數字口徑混用這類會在面試現場穿幫的錯。
 
