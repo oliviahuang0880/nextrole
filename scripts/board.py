@@ -19,6 +19,9 @@ import store  # noqa: E402
 #   分析    stage="saved"     按了儲存、但還沒投的
 #   追蹤    stage="tracker"   真的投出去了（status 不是 None）
 STAGES = ["inbox", "saved", "tracker"]
+# 不在任何一頁的表格裡，只活在彈窗中。離開收件匣的路是單向的：
+# 按過 ✓、或從診斷頁移出的，都不會自己再回到收件匣。
+ASIDE = ["dismissed", "removed"]
 
 # 投遞之後的狀態。沒投遞的職缺 status 是 None，不在這個清單裡。
 STATUSES = ["applied", "first", "second", "third", "offer", "thanks", "ghosted"]
@@ -115,6 +118,12 @@ def stage_of(rec: dict) -> str:
         return "tracker"
     if rec.get("saved"):
         return "saved"
+    if rec.get("ever_saved"):
+        # 存過又移出診斷頁：使用者已經對它做過判斷了，不該再出現在收件匣
+        # 等他重新取捨一次。要找回來是走診斷頁的「已移出」彈窗。
+        return "removed"
+    if rec.get("seen"):
+        return "dismissed"
     return "inbox"
 
 
@@ -123,15 +132,13 @@ def in_stage(b: dict, stage: str) -> list[tuple[str, dict]]:
 
 
 def dismissed(b: dict) -> list[tuple[str, dict]]:
-    """收件匣按了勾勾收起來的（看過、沒存、沒投）。"""
-    return [(jid, r) for jid, r in b["jobs"].items()
-            if r.get("seen") and not r.get("saved") and not r.get("status")]
+    """收件匣按了勾勾收起來的。存過又移出的不算在這裡 —— 那是 removed。"""
+    return in_stage(b, "dismissed")
 
 
 def removed_from_analysis(b: dict) -> list[tuple[str, dict]]:
-    """曾經存進分析頁、後來又移出的。"""
-    return [(jid, r) for jid, r in b["jobs"].items()
-            if r.get("ever_saved") and not r.get("saved") and not r.get("status")]
+    """曾經存進診斷頁、後來又移出的。"""
+    return in_stage(b, "removed")
 
 
 def save(b: dict):
@@ -273,26 +280,23 @@ def counts(board: dict | None = None) -> dict:
     """三頁各自的計數。前綴 _ 的是跨頁的總計。"""
     b = board if board is not None else load()
     out = {s: 0 for s in STATUSES}
-    out.update({st: 0 for st in STAGES})
-    rated = seen = dismiss = 0
+    out.update({st: 0 for st in STAGES + ASIDE})
+    rated = seen = 0
     for rec in b["jobs"].values():
-        st = stage_of(rec)
-        out[st] += 1
+        out[stage_of(rec)] += 1
         if rec.get("status"):
             out[rec["status"]] += 1
         if rec.get("fit", {}).get("total") is not None:
             rated += 1
         if rec.get("seen"):
             seen += 1
-            # 按過 ✓ 的已經從收件匣收起來了，不該再算成「待處理」——
-            # 導覽列的數字要跟頁面上看得到的筆數一致。
-            if st == "inbox":
-                dismiss += 1
-    out["inbox"] -= dismiss
+    # 導覽列的數字要等於收件匣頁面上實際畫得出來的列數。已儲存的仍然留在
+    # 清單上（★ 亮著、不能再按），不畫的只有已投遞／按過 ✓／從診斷頁移出的。
+    out["inbox"] += out["saved"]
     out["_total"] = len(b["jobs"])
     out["_rated"] = rated
     out["_seen"] = seen
-    out["_dismissed"] = dismiss
+    out["_dismissed"] = out["dismissed"]
     return out
 
 

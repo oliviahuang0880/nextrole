@@ -79,10 +79,11 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
     # 按了勾勾的不進表格，只進彈窗
     dismissed = sorted(bd.dismissed(b),
                        key=lambda kv: kv[1]["eval"].get("score", 0), reverse=True)
-    dismissed_ids = {jid for jid, _ in dismissed}
+    # 收件匣畫的是「還在待取捨」的：已儲存的留著（★ 亮起），已投遞、
+    # 按過 ✓、從診斷頁移出的都不畫 —— 離開收件匣是單向的。
     inbox = sorted(
         ((j, r) for j, r in b["jobs"].items()
-         if not r.get("status") and j not in dismissed_ids),
+         if bd.stage_of(r) in ("inbox", "saved")),
         key=lambda kv: kv[1].get("eval", {}).get("score", 0), reverse=True,
     )
 

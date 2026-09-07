@@ -11,10 +11,12 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 
 ## Output Contract
 
-- 唯一持久產物是 `~/.nextrole/profile.json`（覆寫前 `profile_io.py` 會自動備份一份 `profile.<UTC ts>.json`）。
+- 主要持久產物是 `~/.nextrole/profile.json`（覆寫前 `profile_io.py` 會自動備份一份 `profile.<UTC ts>.json`）。
 - 搜尋產出放 `~/.nextrole/output/`：`results_<ts>.html` + `.csv`、重算用的 `_jobs_cache.json`，以及看板 `board.html`。
 - 搜尋收尾會把結果併進 `~/.nextrole/board.json`。**併入只更新分數與 last_seen，使用者在看板上設的狀態／備註／契合度一律保留** — 不得覆寫。
 - `profile.json` 只放長期偏好：關鍵字、權重、`filters`、`negative`、`scoring`。**不得**寫入單次執行才用的東西（`extra_queries` 只當次有效）。
+- Phase 5 收尾若使用者給了主履歷，另外寫 `~/.nextrole/resumes/master-<id>.md`
+  並在 `config.json` 的 `resume_versions` 補一筆。他說「先不要」就什麼都不寫。
 - 所有資料留在使用者本機，不上傳。不需要也不得要求 `ANTHROPIC_API_KEY`。
 - 對話輸出有兩個固定格式：關鍵字清單用 `templates/keywords-report.md`，搜尋回報用 `templates/search-summary.md`。兩者都不得殘留 `{{...}}` 填位符號。
 - 未收到使用者對 Phase 4 提問的回答前，不得寫入 `profile.json`，也不得開始搜尋。
@@ -114,7 +116,16 @@ description: 求職／找工作／換工作流程，預設台灣、可選海外/
 3. READ 讀取 `templates/search-summary.md` 與 `templates/search-summary.example.md`。
 4. WRITE 依樣板回報筆數、來源分佈、健檢結論與具體建議、開啟方式（**必須提醒不要用 `file://`**）。健檢代碼不是 `OK` 時，不得用「完成」的語氣草草帶過。
    收尾要告訴使用者結果已併進看板，用 `/nextrole:board` 或 `cd ~/.nextrole/bin && uv run serve.py` 看。
-5. READ 回頭檢查回報內容有無殘留填位符號、有無違反 `rules/中立與加權判準.md`（例如替使用者推測該走哪個領域）；不符合就立即修正。
+5. WRITE ⭐ **接著問主履歷**（搜尋完就問，不要等他自己想到）：
+
+   > 「接下來要判斷這些職缺值不值得投，我需要你的履歷 —— 契合度診斷要拿你實際做過什麼
+   > 去對照 JD 的職責清單，沒有履歷我只能瞎猜。
+   > 貼上來或給我檔案路徑都行，會存在 `~/.nextrole/resumes/`，不會離開你的電腦。」
+
+   收到就存成 `~/.nextrole/resumes/master-<id>.md`，`<id>` 用他講的方向命名（`pm`、`consultant`…），
+   並順手把 `config.json` 的 `resume_versions` 補一筆。
+   他說「先不要」就記著，等他真的要診斷時再問一次 —— **但不要靜默跳過這一題**。
+6. READ 回頭檢查回報內容有無殘留填位符號、有無違反 `rules/中立與加權判準.md`（例如替使用者推測該走哪個領域）；不符合就立即修正。
 
 ## Phase 6 -- 重新找一次（回訪時）
 

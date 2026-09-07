@@ -75,10 +75,16 @@ cd ~/.nextrole/bin && uv run serve.py
 
 **看到想投的**
 
-1. `/nextrole:board` 對那幾筆做契合度診斷 → 決定投不投
-2. `/nextrole:resume` 客製履歷與求職信
-3. `/nextrole:interview` 準備面試題
-4. `/nextrole:mock` 練一場
+流程走在對話裡，畫面負責讓你看見結果 —— 每一步做完，工具會主動問你下一步。
+
+1. 搜尋完 → 問你要不要放一份主履歷進來（契合度診斷要拿它對照 JD）
+2. `/nextrole:board` 對那幾筆做契合度診斷 → 決定投不投
+3. 診斷完 → 問你要不要客製履歷 → `/nextrole:resume` 產履歷與求職信
+4. `/nextrole:interview` 準備面試題
+5. `/nextrole:mock` 練一場
+
+⚠️ **契合度診斷沒有你的履歷就別做。** 三個指標全部要拿你實際做過什麼去對照 JD，
+沒有這份資料，AI 會憑對話印象猜 —— 而且猜得很像真的。
 
 ## 兩套評分，分工不同
 

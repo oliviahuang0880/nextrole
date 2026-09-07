@@ -130,7 +130,8 @@ def main():
     check(bd.stage_of(bd.load()["jobs"][jid]) == "inbox", "新職缺一開始在收件匣")
 
     bd.patch(other, {"seen": True})
-    check(bd.stage_of(bd.load()["jobs"][other]) == "inbox", "只按『看過』還是留在收件匣（只是預設不顯示）")
+    check(bd.stage_of(bd.load()["jobs"][other]) == "dismissed",
+          "按『看過』就離開收件匣，只留在『已看過』彈窗裡")
 
     bd.patch(jid, {"saved": True})
     rec = bd.load()["jobs"][jid]
@@ -247,8 +248,19 @@ def main():
     z = bd.load()["jobs"]["z"]
     check(z["ever_saved"] and not z["saved"], "移出診斷後 ever_saved 還在")
     check(len(bd.removed_from_analysis(bd.load())) == 1, "移出的查得到，彈窗才列得出來")
-    bd.patch("z", {"seen": True})
+    check(bd.stage_of(z) == "removed", "移出診斷頁的不會掉回收件匣")
+    check(len(bd.dismissed(bd.load())) == 0,
+          "移出的只進診斷頁的彈窗，不會同時出現在收件匣的『已看過』裡")
+
+    # 另開一筆乾淨的來測 ✓：z 已經走過診斷頁，UI 上不可能再對它按 ✓
+    b = bd.load()
+    b["jobs"]["y"] = {"job": {"url": "y", "title": "t2", "company": "c2"},
+                      "eval": {"score": 1}, "fit": {}, "seen": False, "saved": False,
+                      "ever_saved": False, "status": None, "notes": "", "artifacts": {}}
+    bd.save(b)
+    bd.patch("y", {"seen": True})
     check(len(bd.dismissed(bd.load())) == 1, "按 ✓ 收起來的查得到")
+    check(bd.stage_of(bd.load()["jobs"]["y"]) == "dismissed", "按 ✓ 的也不算在收件匣裡")
 
     print("\n[8] 零個人資料：暫存 HOME 以外什麼都沒寫")
     check(store.ROOT.startswith(_TMP), f"所有寫入都在暫存區（{store.ROOT}）")
