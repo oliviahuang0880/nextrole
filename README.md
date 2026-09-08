@@ -1,79 +1,159 @@
-# NextRole — AI 求職盤點工具（Claude Code / Codex）
+# NextRole — AI 求職工具（Claude Code / Codex）
 
-> 求職盤點工具：用對話完成「天賦 + 技能」雙面向問卷 → 中立廣撒搜尋 104/Cake/LinkedIn → 評分 → 產出可篩選的 HTML 報表。
+> 搜職缺 → 評分 → 決定投不投 → 客製履歷 → 準備面試題 → 模擬面試 → 追蹤進度。
+> 同一份資料串到底，**全部存在你自己的電腦上**。
 
-對話跑問卷、Python 跑爬蟲評分。**預設台灣，也可選海外（亞太 / 全球 / 全遠端）**、資料只存使用者本機。
+對話跑問卷與判斷，Python 跑爬蟲、評分與產表。預設台灣，也可選海外（亞太／全球／全遠端）。
+
+## 六個 skill
+
+| 打這個 | 做什麼 | 自然講也會中 |
+|---|---|---|
+| `/nextrole:setup` | 第一次設定、之後改設定 | 「設定求職工具」 |
+| `/nextrole:search` | 天賦＋技能問卷 → 廣撒搜尋 104/Cake/LinkedIn → 評分 | 「找工作」「想換工作」「找遠端工作」 |
+| `/nextrole:board` | 三頁看板：收件匣、契合度診斷、投遞追蹤 | 「我投到哪了」「這個職缺值得投嗎」 |
+| `/nextrole:resume` | 客製履歷與求職信 | 「幫我改履歷」「寫求職信」 |
+| `/nextrole:interview` | 建面試素材、針對職缺出題、同步 Google 試算表 | （只能用指令叫） |
+| `/nextrole:mock` | 模擬面試與復盤 | （只能用指令叫） |
+
+> 最後兩個刻意不設自動觸發詞，避免跟你自己既有的面試相關 skill 互搶。
 
 ## 安裝（Claude Code）
 
 ```bash
-# 1. 裝 uv（Python 腳本執行器，~/3 秒一行指令）
 curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 2. 把 skill clone 到 Claude Code 的 skills 目錄
-git clone https://github.com/oliviahuang0880/nextrole.git ~/.claude/skills/nextrole
-
-# 3. 重開 Claude Code（讓它掃到新 skill）
 ```
 
-> 沒有 `git` 的話也可以下載 zip 解壓到 `~/.claude/skills/nextrole/`。
-
-## 在 Codex（或其他 AI 工具）使用
+```bash
+claude plugin marketplace add oliviahuang0880/nextrole
+```
 
 ```bash
-# clone 到任意位置
+claude plugin install nextrole@nextrole
+```
+
+裝好後在 Claude Code 裡打 `/nextrole:setup` 開始。
+
+## 在 Codex（或其他讀 AGENTS.md 的工具）使用
+
+```bash
 git clone https://github.com/oliviahuang0880/nextrole.git
 cd nextrole
-codex   # 在 repo 資料夾內啟動（Codex 會自動讀 AGENTS.md）
+codex
 ```
 
-然後對它說「幫我找工作」即可，流程跟 Claude Code 版相同。差異：
+然後說「幫我找工作」。差異：Codex 需要**在這個 repo 資料夾內**啟動才會載入指引；
+爬蟲與評分引擎完全相同，問卷對話的細膩度取決於所用模型。
 
-- Codex 需要**在這個 repo 資料夾內**啟動才會載入指引（Claude Code 裝好後在任何資料夾都能觸發）
-- 爬蟲與評分引擎完全相同；問卷對話的細膩度取決於所用模型
-- Codex 端尚無大量實測，遇到問題歡迎開 issue
+## 怎麼用
 
-## 使用
+**第一次**
 
-在 Claude Code 對話框打：
+1. `/nextrole:setup` — 建 `~/.nextrole/`，登記你有幾種履歷、有哪些硬門檻條件
+2. `/nextrole:search` — 天賦問卷（可跳過）＋ 技能問卷（35 題）→ 搜尋 → 評分
+3. `/nextrole:board` — 打開職缺看板
 
-> 「我想找台北的工作」 或 「想換工作」 或 「想找海外/遠端工作」 或 「help me find a remote job」
+**每天**
 
-Skill 會自動觸發，引導你跑：
-
-1. **天賦問卷**（可跳過）— 邀 5–6 位認識你的人寫「你眼中的我」貼回對話，AI 彙整成共通天賦
-2. **技能問卷**（必做，35 題）— 一個技能一題情境式自評
-3. **進階偏好** — 想找哪些地區（台灣 / 亞太 / 全球 / 全遠端，可複選）？要不要偏某個領域？有喜歡的職缺可貼 JD 給 AI 抽關鍵字？有什麼職稱想直接排除？
-4. **搜尋並產出 HTML 報表** — 列出推薦 + 全部職缺、依分數排序、可依來源篩選
-
-完成後開報表：
 ```bash
-cd output && python3 -m http.server 8765
-# 開 http://localhost:8765/results_<timestamp>.html
+cd ~/.nextrole/bin && uv run serve.py
 ```
-**不要用 `file://` 開**，職缺連結會空白（瀏覽器安全機制）。
 
-## 報表長什麼樣
+看板有三頁，左側可切換。**流動方向是單向的**，東西只會往前走：
 
-**推薦區**：達門檻的職缺依分數排序，每筆看得到技能／天賦兩個子分與命中的關鍵字——分數怎麼來的一目瞭然，不是黑盒推薦。
+| 頁 | 回答的問題 | 你在這裡做什麼 |
+|---|---|---|
+| ① 職缺收件匣 | 這批搜尋結果哪些值得留下？ | `✓` 收起來（下次不出現）、`☆` 存進診斷。兩個互不相干 |
+| ② 契合度診斷 | 留下的這幾個，到底投不投？ | 挑幾筆做契合度診斷，決定了按「開始投遞」 |
+| ③ 投遞追蹤 | 投出去的現在到哪了？ | 改狀態、記備註，看漏斗轉換率 |
 
-![推薦職缺區：依總分排序，含技能／天賦子分與命中關鍵字](docs/report-recommended.png)
+第一頁的**評分**（0–100，關鍵字命中）是用來判斷**搜尋詞抓得準不準**，不是判斷該不該投。
+真正決定投不投的是第二頁的**契合度診斷**（13 分制，要讀完整 JD）。
+收起來或移出的職缺都沒有不見，各自的彈窗找得回來。
 
-**廣泛清單**：撈到的全部職缺，可依來源（104 / Cake / LinkedIn）篩選。
+⚠️ **不要用 `file://` 開**，職缺連結會空白、改動也存不回去。
 
-![廣泛清單：全部職缺並可依來源篩選](docs/report-filter.png)
+**看到想投的**
 
-> 截圖用的是示範 profile（通用技能關鍵字），不是任何真實使用者的問卷結果；職缺為公開招募資訊。
+流程走在對話裡，畫面負責讓你看見結果 —— 每一步做完，工具會主動問你下一步。
+
+1. 搜尋完 → 問你要不要放一份履歷進來。**什麼格式都行**，PDF、Word、純文字或直接貼，
+   工具自己轉。契合度診斷要拿它對照 JD
+2. `/nextrole:board` 對存起來的職缺做契合度診斷 → 決定投不投
+3. 診斷完 → 問你要不要客製履歷 → `/nextrole:resume` 產履歷與求職信
+4. `/nextrole:interview` 準備面試題 → 想在手機上複習就同步到 Google 試算表
+5. `/nextrole:mock` 練一場 → 面試完回 `/nextrole:interview` 復盤
+
+⭐ **在別的地方看到的職缺，直接把 JD 貼給它就好**，不用先加進看板。
+貼進來的會自己進看板、先做契合度診斷，再走客製履歷 —— 跟從看板挑的走同一條路。
+貼的時候把原始網址一起給，這筆就會跟爬蟲撈到的合而為一，不會變成兩筆。
+
+⚠️ **契合度診斷沒有你的履歷就別做。** 三個指標全部要拿你實際做過什麼去對照 JD，
+沒有這份資料，AI 會憑對話印象猜 —— 而且猜得很像真的。
+
+## 兩套評分，分工不同
+
+**評分（0–100）** 是廣篩用的。自動全跑，看關鍵字命中：
+總分 = 100 × 技能契合度 + 天賦加分（上限 15） − 負向懲罰。
+命中職稱再 ×2；冷門關鍵字出現在職稱直接排除。
+
+⭐ **天賦只加分，不當分母。** 技能詞（研究、分析、專案管理）本來就是 JD 的用語，
+天賦詞是朋友形容你的話（「面對不確定性」），JD 幾乎不會這樣寫 —— 命中率差一個量級。
+早期版本把兩者放進同一個線性加權，結果是**做過天賦問卷的人分數反而更低**，
+用了功能反而被懲罰。現在天賦只會往上加，而且彙整時會一起產出 JD 慣用語當同義詞。
+
+**契合度診斷（13 分）** 是決定投不投用的。你在看板上勾哪幾筆才算，因為每筆都要讀完整 JD：
+
+- 產業關係 1–4、職務重疊 1–4、條件符合 1–5
+- ➕ **硬門檻**：一條不符合就直接被刷掉的條件（英文流利、必備 N 年年資、必備某產業實戰）。
+  這個框架原本沒有，但它比三個指標加起來更能解釋「為什麼投了沒回音」
+
+投遞門檻預設 7 分，但**每個人的實際命中率不同**。投到十家以上之後跑一次校準：
+
+```bash
+cd ~/.nextrole/bin && uv run calibrate.py
+```
+
+它會統計各分數段投遞後的回應率，告訴你哪個分數以下幾乎沒進面試 —— 那才是你真正的門檻。
+順便點出「沒回應、也沒踩到已知硬門檻」的那幾家，那通常是你還沒登記的硬門檻。
+
+## 資料放哪
+
+**全部在 `~/.nextrole/`，沒有上傳，這個 repo 裡不含任何人的求職素材。**
+
+```
+~/.nextrole/
+├── config.json      設定
+├── profile.json     問卷關鍵字與權重（覆蓋前自動備份）
+├── board.json       職缺主檔
+├── kit/             你的事實庫、故事庫、口徑、弱點清單
+├── resumes/         主履歷與各職缺的客製版
+├── interviews/      各職缺的面試題與模擬復盤
+└── output/          搜尋結果與看板
+```
+
+⭐ **重跑搜尋只會更新分數，不會動你的狀態、備註與契合度診斷。**
+
+Google 試算表是**選用**的輸出。設定了才會同步，而且每次寫入前都會先問過你 ——
+你很可能同時在瀏覽器開著同一份表在改。
+
+## 選用：每天自動跑
+
+```bash
+ln -sf ~/.nextrole/bin/daily_run.sh ~/.nextrole/daily_run.sh
+```
+
+再用 `launchctl load ~/Library/LaunchAgents/<你的 plist>` 排程（macOS），
+或用 cron／排程工作呼叫 `~/.nextrole/bin/daily_run.sh`。
+它會跑 `run_search.py --diff-against auto`，本次新出現的職缺在看板上標 ✨。
 
 ## 需要
 
 - [Claude Code](https://docs.claude.com/claude-code)，或 [Codex](https://openai.com/codex/) 等會讀 `AGENTS.md` 的 AI 工具
 - [uv](https://docs.astral.sh/uv/)（偵測到沒裝會問是否代裝）
-- **不需要任何 API key，也不需要 `.env`** — AI 推理（彙整朋友描述、抽 JD 關鍵字）由對話中的 AI 助手處理
+- **不需要任何 API key，也不需要 `.env`**
 
 ### 選用：走 proxy（爬蟲被擋時）
-
-若 104 / Cake / LinkedIn 開始回錯誤或空結果（被限流或擋 IP），可以用環境變數讓爬蟲走 HTTP proxy——在 shell 裡設好再跑，不需要設定檔：
 
 ```bash
 export PROXY_URL=http://user:pass@host:port        # http、https 都走這個
@@ -84,40 +164,50 @@ export PROXY_URL_HTTPS=http://host:port
 
 不設（預設）就是直連。
 
-## 隱私
+## 開發
 
-- 所有資料（profile、爬到的職缺、報表）只存使用者本機，**沒有上傳**
-- profile 位置：`~/.nextrole/profile.json`（覆蓋前自動備份）
-- 報表位置：執行 `claude` 時當前目錄下的 `./output/`
+想看版面長怎樣、又不想真的跑爬蟲，就自己餵一份假的職缺快取：
+把一個 job 陣列（`source`／`title`／`company`／`url`／`location`／`description`）
+寫進 `~/.nextrole/output/_jobs_cache.json`，再跑
 
-## 重新使用
+```bash
+uv run scripts/run_search.py --from-cache
+```
 
-下次想再找：
+它會走完整的評分、過濾、去重與看板合併，只是不連網路。
+⚠️ 快取不存在時 `--from-cache` 會直接報錯，不會偷偷改去爬。
 
-| 場景 | 指令 |
-|---|---|
-| 重抓新職缺（profile 不變） | 對話「我要重新找職缺」→ 跑 `run_search.py` |
-| 只想調關鍵字重算（不重抓） | 對話「重算一下」→ 跑 `run_search.py --from-cache`（秒算、不耗 token） |
-| 重做問卷 | 對話「重做問卷」→ 從技能問卷重來，舊 profile 自動備份 |
+⚠️ 改了 `ui.py` 或 `render_board.py` 之後**要重開 `serve.py`** ——
+它把模組留在記憶體裡，每次寫回都會用舊的那份重畫，會蓋掉你手動產生的檔案。
 
-不限次數，使用者自費 token。
+⚠️ 改了任何 `SKILL.md` 之後，slash command 不會馬上跟著變。它讀的是 plugin 快取，
+不是這個工作目錄。要三步，缺一不可：
 
-## 評分邏輯（摘要）
+```bash
+claude plugin marketplace update nextrole && claude plugin update nextrole@nextrole
+```
 
-- 總分 = **技能契合度 (60%) + 天賦契合度 (40%) − 負向懲罰**，0–100 分
-- 沒做天賦問卷時自動切 100% 技能
-- 命中職稱再 ×2 boost
-- 「冷／硬冷」關鍵字出現在職稱直接排除（例：實習、財會、平面設計、表演⋯ 視個人分類而定）
+然後**重開 Claude Code**。注意是 `plugin update` 不是 `plugin install` ——
+對已經裝好的 plugin，`install` 是 no-op，會安靜地什麼都不做。
+（Python 腳本不受影響，它們走 `~/.nextrole/bin` symlink，指到這個工作目錄，改了即時生效。）
 
-## 也有網站版
+版面規範在 [`design.md`](design.md)。改任何一頁之前先讀那份，
+樣式一律寫在 `scripts/ui.py` 的共用 CSS，不要為單一頁另寫。
 
-有 GUI 偏好的人可以用網站版（同方法、不同介面）：（連結待補）。
+```bash
+uv run scripts/selftest.py
+```
+
+在暫存目錄跑一次完整資料流，順便稽核這個 repo 裡有沒有混進試算表 ID、Email、
+電話或薪資帶 —— 這是公開 repo，個人素材一律不進來。
 
 ## 已知限制
 
-- 預設搜尋台灣的 104 / Cake / LinkedIn（規模約 300–400 筆/次）；選亞太/全球/遠端時 104 自動跳過、LinkedIn 改撈對應地點（亞太掃 7 城會多 5–8 分鐘）
-- Cake / LinkedIn 改版時可能爬不到；搜尋跑完會印一段「健檢」，某一站掛掉、結果被條件濾光、或沒有職缺過門檻時都會明講原因與具體建議，不會靜默丟一份空報表給你
-- 不做帳號、雲端儲存（資料就放使用者本機）
+- 預設搜尋台灣的 104 / Cake / LinkedIn（約 300–400 筆／次）；選亞太／全球／遠端時
+  104 自動跳過、LinkedIn 改撈對應地點（亞太掃 7 城會多 5–8 分鐘）
+- Cake / LinkedIn 改版時可能爬不到。搜尋跑完會印一段「健檢」，某一站掛掉、
+  結果被條件濾光、或沒有職缺過門檻時都會明講原因與建議，不會靜默丟一份空報表
+- 不做帳號、雲端儲存
 
 ## 授權
 

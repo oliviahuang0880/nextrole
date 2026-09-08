@@ -13,7 +13,8 @@ import copy
 def merge_into(base: dict | None, talents: list[dict]) -> dict:
     """把天賦併入既有 profile（多半來自技能問卷）；沒有 base 時建最小 profile。
 
-    有方法二技能時 blend 0.6/0.4；只有方法一時 100% 方法一（但提醒仍需技能問卷產生搜尋詞）。
+    天賦是單向加分（見 score.py 的說明），所以這裡不再設 blend 權重，
+    只設加分上限 talent_bonus_cap。
     """
     if base:
         p = copy.deepcopy(base)
@@ -25,10 +26,10 @@ def merge_into(base: dict | None, talents: list[dict]) -> dict:
         }
     p["method1_positive"] = talents
     total = sum(t.get("weight", 2) for t in talents) or 1
-    has_m2 = bool(p.get("method2_positive"))
     sc = p.setdefault("scoring", {})
-    sc["blend_method2"] = 0.6 if has_m2 else 0.0
-    sc["blend_method1"] = 0.4 if has_m2 else 1.0
+    sc.pop("blend_method2", None)      # 舊 profile 留下來的，已經不看了
+    sc.pop("blend_method1", None)
+    sc["talent_bonus_cap"] = 15
     sc["method1_full"] = max(8, round(0.5 * total))
     sc.setdefault("method2_full", 12)
     sc.setdefault("threshold", 60)

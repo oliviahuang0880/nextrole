@@ -1,0 +1,14 @@
+{
+  "name": "nextrole",
+  "owner": {
+    "name": "Olivia Huang"
+  },
+  "plugins": [
+    {
+      "name": "nextrole",
+      "source": "./",
+      "description": "求職全流程：搜職缺、取捨、契合度診斷、客製履歷、面試題、模擬面試、投遞追蹤。"
+    }
+  ],
+  "description": "求職工具的 plugin marketplace。目前收錄 nextrole 一個 plugin。"
+}
