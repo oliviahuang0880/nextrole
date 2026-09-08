@@ -465,7 +465,8 @@ window.NR = (function(){
     row.querySelector('.m').textContent=info.meta;
     var btn=document.createElement('button');
     btn.className='btn btn-s dlg-restore';
-    btn.dataset.id=info.id; btn.dataset.field=info.field; btn.dataset.value='0';
+    // value 是「放回去」要寫的值，兩個彈窗相反（seen→0、saved→1），不可以寫死
+    btn.dataset.id=info.id; btn.dataset.field=info.field; btn.dataset.value=info.value;
     btn.textContent=info.label;
     wireRestore(btn);
     row.appendChild(btn);

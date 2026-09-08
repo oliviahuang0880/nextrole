@@ -45,8 +45,13 @@ def empty(title: str, hint: str) -> str:
 
 
 def dialog(did: str, title: str, hint: str, rows: list[tuple[str, dict]],
-           field: str, btn: str) -> str:
-    """列出被收起來的職缺，每筆可以放回去。"""
+           field: str, btn: str, value: str) -> str:
+    """列出被收起來的職缺，每筆可以放回去。
+
+    value 是「放回去」要寫進 field 的值，兩個彈窗剛好相反，不可以寫死：
+      收件匣「已看過」 field=seen  → value=0（取消看過，回到清單）
+      診斷頁「已移出」 field=saved → value=1（重新儲存，回到診斷）
+    """
     if rows:
         items = "".join(
             f"<div class='dlg-row'><div class='g'>"
@@ -54,7 +59,7 @@ def dialog(did: str, title: str, hint: str, rows: list[tuple[str, dict]],
             f"<div class='m'>{E(r['job'].get('company',''))}　·　"
             f"{E(r['job'].get('location',''))}　·　評分 {r['eval'].get('score',0)}</div></div>"
             f"<button class='btn btn-s dlg-restore' data-id='{jid}' "
-            f"data-field='{field}' data-value='0'>{btn}</button></div>"
+            f"data-field='{field}' data-value='{value}'>{btn}</button></div>"
             for jid, r in rows
         )
     else:
@@ -113,8 +118,11 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
             f"<td class='meta' title='{E(j.get('location',''))}'>{E(j.get('location',''))}</td>"
             f"<td class='meta' title='{E('、'.join(all_kw))}'>{E(kw)}</td>"
             f"<td class='acts'>"
+            # 已儲存的那一列本來就留在收件匣（design.md），沒有東西可以收起來；
+            # 而 seen=true 對 saved=true 的紀錄不改變去處，按了會是靜默無效。
             f"<button class='ico act-seen' data-id='{jid}' "
-            f"title='看過了，從清單收起來'>✓</button>"
+            f"title='{'已儲存，這一列留在清單上' if saved else '看過了，從清單收起來'}'"
+            f"{' disabled' if saved else ''}>✓</button>"
             f"<button class='ico star act-save{' on' if saved else ''}' data-id='{jid}' "
             f"title='{'已儲存' if saved else '儲存，進到契合度診斷'}'"
             f"{' disabled' if saved else ''}>{'★' if saved else '☆'}</button>"
@@ -166,7 +174,7 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
         "<span class='sp' id='cnt'></span></div>"
         + table
         + dialog("seenDlg", "已看過", "按了 ✓ 收起來的職缺。下次自動搜尋也不會再出現。"
-                 "想放回清單就按右邊的按鈕。", dismissed, "seen", "放回清單")
+                 "想放回清單就按右邊的按鈕。", dismissed, "seen", "放回清單", "0")
     )
 
     js = """
@@ -195,10 +203,11 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
     // ✓ 看過 → 該列立刻消失。要放回來得從篩選列的「已看過」彈窗。
     document.querySelectorAll('.act-seen').forEach(function(btn){
       btn.onclick=function(){
+        if(btn.disabled) return;
         var r=rowOf(btn.dataset.id);
         NR.patch(btn.dataset.id,'seen',true,btn,function(){
           r.dataset.gone='1';
-          NR.stash('seenDlg',{id:r.dataset.id, field:'seen', label:'放回清單',
+          NR.stash('seenDlg',{id:r.dataset.id, field:'seen', value:'0', label:'放回清單',
             title:r.dataset.title,
             meta:r.dataset.company+'　·　'+r.dataset.loc+'　·　評分 '+r.dataset.score});
           apply();
@@ -209,10 +218,14 @@ def render_inbox(b: dict, cfg: dict, path: str) -> str:
     document.querySelectorAll('.act-save').forEach(function(btn){
       btn.onclick=function(){
         if(btn.disabled) return;
-        rowOf(btn.dataset.id).dataset.saved='1';
+        var r=rowOf(btn.dataset.id);
+        r.dataset.saved='1';
         NR.patch(btn.dataset.id,'saved',true,btn,function(){
           btn.textContent='★'; btn.classList.add('on');
           btn.disabled=true; btn.title='已儲存（要取消請到契合度診斷頁）';
+          // 這一列現在留在清單上，✓ 沒有東西可以收 —— 跟伺服器畫出來的一致
+          var sb=r.querySelector('.act-seen');
+          if(sb){ sb.disabled=true; sb.title='已儲存，這一列留在清單上'; }
         });
       };
     });
@@ -331,7 +344,7 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
             "還沒有要診斷的職缺",
             "去<a href='inbox.html'>職缺收件匣</a>把想投的按「☆」，它們就會出現在這裡。"))
         + dialog("outDlg", "已移出", "從契合度診斷移出去的職缺。診斷結果會留著，"
-                 "放回來就看得到。", removed, "saved", "放回診斷")
+                 "放回來就看得到。", removed, "saved", "放回診斷", "1")
     )
 
     js = """
@@ -362,7 +375,7 @@ def render_analysis(b: dict, cfg: dict, path: str) -> str:
         var c=btn.closest('.an');
         NR.patch(btn.dataset.id,'saved',false,btn,function(){
           c.dataset.gone='1';
-          NR.stash('outDlg',{id:c.dataset.id, field:'saved', label:'放回診斷',
+          NR.stash('outDlg',{id:c.dataset.id, field:'saved', value:'1', label:'放回診斷',
             title:c.dataset.title,
             meta:c.dataset.company+'　·　'+c.dataset.loc+'　·　評分 '+c.dataset.score});
           apply();

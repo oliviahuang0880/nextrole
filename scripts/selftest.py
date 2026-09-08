@@ -72,8 +72,11 @@ ALLOWED = [r"github\.com/[\w-]+/nextrole", r"0900-000-000"]
 
 def audit_repo(root: str) -> list[str]:
     hits = []
-    files = subprocess.run(["git", "-C", root, "ls-files"], capture_output=True,
-                           text=True, check=True).stdout.split()
+    # -z 是必要的：預設輸出會把非 ASCII 路徑加引號並轉義（core.quotePath），
+    # 中文檔名一律 open 不到，然後被下面的 except 靜靜跳過 —— 等於沒稽核到。
+    files = subprocess.run(["git", "-C", root, "ls-files", "-z"], capture_output=True,
+                           text=True, check=True).stdout.split("\0")
+    files = [f for f in files if f]
     # selftest 本身就寫著那些樣態，掃到自己不算
     skip = {"scripts/selftest.py"}
     for rel in files:
@@ -206,6 +209,13 @@ def main():
     check(">評分<" in docs["inbox.html"], "收件匣的欄位叫『評分』")
     check("seenDlg" in docs["inbox.html"], "收件匣有『已看過』彈窗")
     check("outDlg" in docs["analysis.html"], "診斷頁有『已移出』彈窗")
+    # 已儲存（★）的那一列留在收件匣，✓ 對它不會有任何效果，所以不能讓它按得下去
+    inb = docs["inbox.html"]
+    seg = inb[inb.index(f"<tr class='row' data-id='{third}'"):]
+    check("disabled" in seg[seg.index("act-seen"):seg.index("act-save")],
+          "已儲存的那一列，✓ 是停用的")
+    check(bd.stage_of({"saved": True, "seen": True}) == "saved",
+          "對已儲存的紀錄設 seen 不會改變它的去處 —— 這就是 ✓ 要停用的理由")
     # 未評分的卡片要自己講出「下一步在對話裡」，不然使用者會在頁面上找按鈕
     an = docs["analysis.html"]
     check("未評分" in an and "data-say='" in an, "存了但還沒診斷的會畫成未評分那一格")
@@ -287,6 +297,19 @@ def main():
     check(len(bd.dismissed(bd.load())) == 1, "按 ✓ 收起來的查得到")
     check(bd.stage_of(bd.load()["jobs"]["y"]) == "dismissed", "按 ✓ 的也不算在收件匣裡")
 
+    print("\n[7d2] 兩個彈窗的『放回去』送的值剛好相反")
+    d2 = {os.path.basename(p): open(p, encoding="utf-8").read()
+          for p in render_board.render_all(bd.load(), cfg)}
+    out_btn = d2["analysis.html"]
+    out_btn = out_btn[out_btn.index("dlg-restore"):]
+    check("data-field='saved' data-value='1'" in out_btn,
+          "『放回診斷』送 saved=1（送 0 就是它現在的值，等於按了沒反應）")
+    seen_btn = d2["inbox.html"]
+    seen_btn = seen_btn[seen_btn.index("dlg-restore"):]
+    check("data-field='seen' data-value='0'" in seen_btn, "『放回清單』送 seen=0")
+    bd.patch("z", {"saved": True})
+    check(bd.stage_of(bd.load()["jobs"]["z"]) == "saved", "放回診斷之後真的回到診斷頁")
+
     print("\n[7e] 履歷可以丟任何格式，我們自己轉 Markdown")
     import import_resume as ir
     html = ("<html><head><style>a{}</style><script>x=1</script></head><body>"
@@ -362,6 +385,39 @@ def main():
     check(not hits, "repo 裡查無試算表 ID／Email／電話／薪資帶")
     for h in hits:
         print(f"     {h}")
+
+    print("\n[9b] 稽核掃得到中文檔名 —— 最可能寫進真人資料的就是那些檔")
+    fake = os.path.join(_TMP, "auditrepo", "rules")
+    os.makedirs(fake, exist_ok=True)
+    subprocess.run(["git", "init", "-q", os.path.dirname(fake)], check=True)
+    for name in ("SKILL.md", "契合度診斷判準.md"):
+        with open(os.path.join(fake, name), "w", encoding="utf-8") as f:
+            f.write("聯絡 someone@notexample.com，期望待遇月薪 95000。\n")
+    subprocess.run(["git", "-C", os.path.dirname(fake), "add", "-A"], check=True)
+    planted = audit_repo(os.path.dirname(fake))
+    check(any("契合度診斷判準.md" in h for h in planted),
+          f"中文檔名的檔案也稽核得到（掃到 {len(planted)} 筆）")
+
+    print("\n[10] 重做技能問卷不得清掉使用者手填的東西")
+    import method2
+    old_profile = {
+        "candidate_titles": ["產品經理"],
+        "field_terms": ["UX"],
+        # 4e 手填的（沒有 src）＋ 上一次問卷產生的（有 src）
+        "negative": [{"term": "實習", "en": "intern", "exclude_if_title": True},
+                     {"term": "表演", "en": "perform", "penalty": 30, "src": "questionnaire"}],
+        "scoring": {"use_field_terms": True, "method1_full": 8},
+    }
+    redo = method2.build_profile({"research": "on_fire", "budget": "cold"}, base=old_profile)
+    terms = [n["term"] for n in redo["negative"]]
+    check("實習" in terms, "使用者手填的負向詞（4e）在重做問卷後還在")
+    check("表演" not in terms, "上一次問卷產生的負向詞會被這次的取代，不會累積")
+    check(any(n.get("src") == "questionnaire" for n in redo["negative"]),
+          "問卷產生的負向詞標得出來源，下次才分得出哪些可以重建")
+    check(redo["candidate_titles"] == ["產品經理"] and redo["field_terms"] == ["UX"]
+          and redo["scoring"]["use_field_terms"] is True, "Phase 4 的答案沿用舊值")
+    check(redo["scoring"]["method1_full"] == 8,
+          f"method1_full 沿用校準過的舊值（得到 {redo['scoring']['method1_full']}）")
 
     print()
     if FAILED:
